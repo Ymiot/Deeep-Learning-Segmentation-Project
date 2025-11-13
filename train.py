@@ -1,92 +1,141 @@
 import os
-import numpy as np
-import glob
-import PIL.Image as Image
-
-# pip install torchsummary
+import argparse
+import yaml
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import torchvision.datasets as datasets
+import torch.optim as optim
 from torch.utils.data import DataLoader
 import torchvision.transforms as transforms
-from torchvision import models
-from torchsummary import summary
-import torch.optim as optim
-from time import time
+import numpy as np
+
 from lib.model.EncDecModel import EncDec
-from lib.model.DilatedNetModel import DilatedNet
-from lib.model.UNetModel import UNet, UNet2
+from lib.model.UNetModel import UNet
 from lib.losses import BCELoss, DiceLoss, FocalLoss, BCELoss_TotalVariation
+from lib.metrics import compute_all
+from lib.datasets.phc_dataset import PhCDataset
+from lib.datasets.retina_dataset import RetinaDataset
 
-# Dataset
-size = 128
-train_transform = transforms.Compose([transforms.Resize((size, size)),
-                                    transforms.ToTensor()])
-test_transform = transforms.Compose([transforms.Resize((size, size)),
-                                    transforms.ToTensor()])
+def parse_args():
+    p = argparse.ArgumentParser()
+    p.add_argument("--config", type=str, default="configs/default.yaml")
+    p.add_argument("--model", type=str, choices=["encdec","unet"], default="unet")
+    p.add_argument("--loss", type=str, choices=["bce","dice","focal","bce_weighted","bce_tv"], default="bce")
+    p.add_argument("--dataset", type=str, choices=["phc","retina"], default="phc")
+    p.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu")
+    return p.parse_args()
 
-batch_size = 6
-trainset = PhC(train=True, transform=train_transform)
-train_loader = DataLoader(trainset, batch_size=batch_size, shuffle=True,
-                          num_workers=3)
-testset = PhC(train=False, transform=test_transform)
-test_loader = DataLoader(testset, batch_size=batch_size, shuffle=False,
-                          num_workers=3)
-# IMPORTANT NOTE: There is no validation set provided here, but don't forget to
-# have one for the project
+def get_loss(name):
+    if name == "bce": return BCELoss()
+    if name == "dice": return DiceLoss()
+    if name == "focal": return FocalLoss()
+    if name == "bce_weighted": return BCELoss(weight_pos=3.0)
+    if name == "bce_tv": return BCELoss_TotalVariation(tv_weight=1e-4)
+    raise ValueError(name)
 
-print(f"Loaded {len(trainset)} training images")
-print(f"Loaded {len(testset)} test images")
+def load_indices(path):
+    with open(path) as f:
+        return [int(x.strip()) for x in f.readlines()]
 
-# Training setup
-device = ...
-model = EncDec().to(device)
-#model = UNet().to(device) # TODO
-#model = UNet2().to(device) # TODO
-#model = DilatedNet().to(device) # TODO
-#summary(model, (3, 256, 256))
-learning_rate = 0.001
-opt = optim.Adam(model.parameters(), learning_rate)
+def main():
+    args = parse_args()
+    with open(args.config) as f:
+        cfg = yaml.safe_load(f)
 
-loss_fn = BCELoss()
-#loss_fn = DiceLoss() # TODO
-#loss_fn = FocalLoss() # TODO
-#loss_fn = BCELoss_TotalVariation() # TODO
-epochs = 20
+    torch.manual_seed(cfg["seed"])
+    size = cfg["image_size"]
+    transform = transforms.Compose([
+        transforms.Resize((size,size)),
+        transforms.ToTensor()
+    ])
 
-# Training loop
-X_test, Y_test = next(iter(test_loader))
-model.train()  # train mode
-for epoch in range(epochs):
-    tic = time()
-    print(f'* Epoch {epoch+1}/{epochs}')
+    if args.dataset == "phc":
+        train_idx = load_indices("splits/phc_train.txt")
+        val_idx = load_indices("splits/phc_val.txt")
+        test_idx = load_indices("splits/phc_test.txt")
+        train_ds = PhCDataset(cfg["phc_root"], train_idx, transform)
+        val_ds = PhCDataset(cfg["phc_root"], val_idx, transform)
+        test_ds = PhCDataset(cfg["phc_root"], test_idx, transform)
+        is_retina = False
+    else:
+        train_idx = load_indices("splits/retina_train.txt")
+        val_idx = load_indices("splits/retina_val.txt")
+        test_idx = load_indices("splits/retina_test.txt")
+        train_ds = RetinaDataset(cfg["retina_root"], train_idx, transform)
+        val_ds = RetinaDataset(cfg["retina_root"], val_idx, transform)
+        test_ds = RetinaDataset(cfg["retina_root"], test_idx, transform)
+        is_retina = True
 
-    avg_loss = 0
-    for X_batch, y_true in train_loader:
-        X_batch = X_batch.to(device)
-        y_true = y_true.to(device)
+    train_loader = DataLoader(train_ds, batch_size=cfg["batch_size"], shuffle=True, num_workers=4)
+    val_loader = DataLoader(val_ds, batch_size=cfg["batch_size"], shuffle=False, num_workers=2)
+    test_loader = DataLoader(test_ds, batch_size=cfg["batch_size"], shuffle=False, num_workers=2)
 
-        # set parameter gradients to zero
-        opt.zero_grad()
+    if args.model == "encdec":
+        model = EncDec(in_channels=3)
+    else:
+        model = UNet(in_channels=3, out_channels=1, base=cfg["unet_base"], depth=cfg["unet_depth"])
 
-        # forward
-        y_pred = model(X_batch)
-        # IMPORTANT NOTE: Check whether y_pred is normalized or unnormalized
-        # and whether it makes sense to apply sigmoid or softmax.
-        loss = loss_fn(y_pred, y_true)  # forward-pass
-        loss.backward()  # backward-pass
-        opt.step()  # update weights
+    model = model.to(args.device)
+    loss_fn = get_loss(args.loss)
+    opt = optim.Adam(model.parameters(), lr=cfg["lr"])
 
-        # calculate metrics to show the user
-        avg_loss += loss / len(train_loader)
+    best_val_dice = 0
+    os.makedirs("checkpoints", exist_ok=True)
 
-    # IMPORTANT NOTE: It is a good practice to check performance on a
-    # validation set after each epoch.
-    #model.eval()  # testing mode
-    #Y_hat = F.sigmoid(model(X_test.to(device))).detach().cpu()
-    print(f' - loss: {avg_loss}')
+    for epoch in range(cfg["epochs"]):
+        model.train()
+        epoch_loss = 0
+        for batch in train_loader:
+            if is_retina:
+                imgs = batch["image"].to(args.device)
+                masks = batch["mask"].to(args.device)
+                fov = batch["fov"].to(args.device)
+            else:
+                imgs, masks = batch
+                imgs = imgs.to(args.device)
+                masks = masks.to(args.device)
+                fov = None
 
-# Save the model
-torch.save(model, ....)
-print("Training has finished!")
+            logits = model(imgs)
+            loss = loss_fn(logits, masks)
+            opt.zero_grad()
+            loss.backward()
+            opt.step()
+            epoch_loss += loss.item()
+
+        # Validation phase
+        model.eval()
+        val_metrics = []
+        with torch.no_grad():
+            for batch in val_loader:
+                if is_retina:
+                    imgs = batch["image"].to(args.device)
+                    masks = batch["mask"].to(args.device)
+                    fov = batch["fov"].to(args.device)
+                else:
+                    imgs, masks = batch
+                    imgs = imgs.to(args.device)
+                    masks = masks.to(args.device)
+                    fov = None
+
+                logits = model(imgs)
+                probs = torch.sigmoid(logits)
+                for i in range(probs.shape[0]):
+                    mask_sel = masks[i]
+                    pred_sel = probs[i]
+                    fov_sel = fov[i] if (is_retina and fov is not None) else None
+                    m = compute_all(pred_sel, mask_sel, mask=(fov_sel == 1) if fov_sel is not None else None)
+                    val_metrics.append({k: v.item() for k,v in m.items()})
+
+        avg_val = {k: np.mean([m[k] for m in val_metrics]) for k in val_metrics[0].keys()}
+        dice_val = avg_val["dice"]
+        print(f"Epoch {epoch+1}/{cfg['epochs']} TrainLoss={epoch_loss/len(train_loader):.4f} "
+              f"ValDice={dice_val:.4f} ValIoU={avg_val['iou']:.4f}")
+
+        if dice_val > best_val_dice:
+            best_val_dice = dice_val
+            torch.save(model.state_dict(), f"checkpoints/{args.model}_{args.dataset}_best.pt")
+            print("  -> New best model saved.")
+
+    print("Training complete.")
+
+if __name__ == "__main__":
+    main()
