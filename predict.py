@@ -15,11 +15,15 @@ def save_mask(array, path):
     im_arr = (array*255).astype(np.uint8)
     Image.fromarray(im_arr).save(path)
 
+def load_paths(path):
+    with open(path) as f:
+        return [line.strip() for line in f if line.strip()]
+
 def parse_args():
     p = argparse.ArgumentParser()
     p.add_argument("--checkpoint", type=str, required=True)
-    p.add_argument("--model", type=str, choices=["encdec","unet"], default="unet")
-    p.add_argument("--dataset", type=str, choices=["phc","retina"], default="phc")
+    p.add_argument("--model", type=str, choices=["encdec","unet"], default="encdec")
+    p.add_argument("--dataset", type=str, choices=["phc","retina"], default="retina")
     p.add_argument("--config", type=str, default="configs/default.yaml")
     p.add_argument("--out", type=str, required=True)
     p.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu")
@@ -33,12 +37,14 @@ def main():
     transform = transforms.Compose([transforms.Resize((size,size)), transforms.ToTensor()])
 
     if args.dataset == "phc":
-        test_idx = [int(i) for i in open("splits/phc_test.txt").read().strip().splitlines()]
-        test_ds = PhCDataset(cfg["phc_root"], test_idx, transform)
+        test_paths = load_paths("splits/phc_test.txt")
+        img_root = os.path.join(cfg["phc_root"], "images")
+        mask_root = os.path.join(cfg["phc_root"], "masks")
+        test_ds = PhCDataset(test_paths, img_root, mask_root, transform)
         is_retina = False
     else:
-        test_idx = [int(i) for i in open("splits/retina_test.txt").read().strip().splitlines()]
-        test_ds = RetinaDataset(cfg["retina_root"], test_idx, transform)
+        test_paths = load_paths("splits/retina_test.txt")
+        test_ds = RetinaDataset(test_paths, cfg["retina_root"], transform)
         is_retina = True
 
     loader = DataLoader(test_ds, batch_size=1, shuffle=False)
