@@ -5,5 +5,5 @@ epochs: 40
 lr: 0.0005
 unet_base: 32
 unet_depth: 4
-phc_root: /dtu/datasets1/02516/PhC
-retina_root: /dtu/datasets1/02516/Retina
+phc_root: /dtu/datasets1/02516/DRIVE
+retina_root: /dtu/datasets1/02516/PH2_Dataset_images
