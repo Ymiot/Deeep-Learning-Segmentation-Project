@@ -1,65 +1,63 @@
 # Deep Learning Segmentation Project
 
-This repository provides a framework for semantic image segmentation using deep learning.  
-It is designed for experiments on two biomedical datasets (PhC cell segmentation and retinal vessel segmentation) located at `/dtu/datasets1/02516`.
-
-## Directory Structure
-
+## Folder layout
 ```
 .
-├── train.py            # Model training script
-├── predict.py          # Inference/prediction script
-├── measure.py          # Compute segmentation metrics
+├── train.py            # Training script
+├── predict.py          # Inference on test split
+├── measure.py          # Compute Dice/IoU/Accuracy/Sensitivity/Specificity
 ├── scripts/
-│   └── create_splits.py  # Script to create train/val/test splits
-├── splits/             # Folder with split indices (generated)
+│   └── create_splits.py  # Create split files from dataset folders (writes filepaths)
+├── splits/             # Generated split lists (*.txt with filepaths)
 ├── configs/
-│   └── default.yaml      # Main config file (paths, hyperparams)
+│   └── default.yaml      # Hyperparameters + dataset roots
 ├── lib/
-│   ├── model/            # Model architectures (EncDec, UNet, ...)
-│   ├── losses.py         # Loss functions
-│   ├── metrics.py        # Metric functions
-│   └── datasets/         # Custom PyTorch Dataset classes
-└── requirements.txt      # Python dependencies
+│   ├── datasets/
+│   │   ├── retina_dataset.py  # DRIVE layout support (training/test; 1st_manual; mask as FOV)
+│   │   └── phc_dataset.py     # Generic images/masks layout (filepaths-based)
+│   ├── model/                 # EncDec (baseline), UNet (optional)
+│   ├── losses.py
+│   ├── metrics.py
+│   └── utils.py (optional)
+└── requirements.txt
 ```
 
-## Quick Start
+## Quick start
+1) Install
+```
+pip install -r requirements.txt
+```
 
-1. **Install dependencies**
-   ```
-   pip install -r requirements.txt
-   ```
+2) Create splits (DRIVE official layout)
+```
+python scripts/create_splits.py --dataset retina --root /dtu/datasets1/02516/DRIVE --output splits/
+# Optional (if you also use PhC):
+python scripts/create_splits.py --dataset phc --root /dtu/datasets1/02516/phc_data --output splits/ \
+  --images_dir images --masks_dir masks
+```
 
-2. **Create dataset splits**  
-   (*Run once for each dataset. Adjust `--root` as needed.*)
-   ```
-   python scripts/create_splits.py --dataset phc --root /dtu/datasets1/02516/PhC --output splits/
-   python scripts/create_splits.py --dataset retina --root /dtu/datasets1/02516/Retina --output splits/
-   ```
+3) Update config
+- Set `retina_root: /dtu/datasets1/02516/DRIVE`
+- (Optional) set `phc_root` if using PhC
 
-3. **Edit `configs/default.yaml`**  
-   - Update dataset root paths if necessary.
+4) Train (baseline EncDec)
+```
+python train.py --config configs/default.yaml --model encdec --dataset retina --loss bce
+```
 
-4. **Train a model**
-   ```
-   python train.py --config configs/default.yaml --model encdec --dataset phc --loss bce
-   ```
+5) Predict on test split
+```
+python predict.py --checkpoint checkpoints/encdec_retina_best.pt --dataset retina --model encdec --out outputs/retina/test/
+```
 
-5. **Predict segmentations on test set**
-   ```
-   python predict.py --checkpoint checkpoints/encdec_phc_best.pt --dataset phc --model encdec --out outputs/phc/test/
-   ```
+6) Measure (for DRIVE include FOV to ignore black border)
+```
+python measure.py --pred outputs/retina/test/ \
+  --gt /dtu/datasets1/02516/DRIVE/test/1st_manual/ \
+  --fov /dtu/datasets1/02516/DRIVE/test/mask/
+```
 
-6. **Evaluate metrics**
-   ```
-   python measure.py --pred outputs/phc/test/ --gt /dtu/datasets1/02516/PhC/masks/
-   ```
-
-## Notes
-
-- The default model is a simple encoder–decoder CNN based on the project's requirements.
-- Dataset-specific details (preprocessing, mask handling, FOV for retina) are handled by the relevant dataloader.
-- All random splits are reproducible via a fixed seed in the config.
-- Add further models, losses, or augmentations as needed using the modular structure.
-
-For any questions about extending or running the code, please refer to comments in the scripts or contact the project maintainers.
+Notes
+- Splits contain filepaths to images; datasets derive vessel and FOV masks from DRIVE naming rules.
+- Baseline simple model (EncDec) is preserved.
+- If your PhC folder differs, pass `--images_dir` and `--masks_dir` to the split script.
