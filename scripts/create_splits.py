@@ -2,15 +2,14 @@ import argparse, os, glob, random
 
 def parse_args():
     p = argparse.ArgumentParser()
-    p.add_argument("--dataset", choices=["phc","retina"], required=True,
-                   help="retina = DRIVE layout (/training,/test). phc = generic images/masks layout.")
-    p.add_argument("--root", required=True, help="Dataset root directory.")
+    p.add_argument("--dataset", choices=["retina","phc"], required=True,
+                   help="retina = DRIVE; phc = phc_data layout with train/test.")
+    p.add_argument("--root", required=True, help="Root directory of dataset.")
     p.add_argument("--output", required=True, help="Output directory for split files.")
-    p.add_argument("--train", type=float, default=0.7, help="Train fraction (for datasets where we split).")
-    p.add_argument("--val", type=float, default=0.15, help="Val fraction (for datasets where we split).")
-    # For generic PhC-like datasets
-    p.add_argument("--images_dir", type=str, default="images", help="Relative images dir under root (PHC).")
-    p.add_argument("--masks_dir", type=str, default="masks", help="Relative masks dir under root (PHC).")
+    p.add_argument("--train_frac", type=float, default=0.8,
+                   help="Fraction of TRAIN folder used for training (rest for validation).")
+    p.add_argument("--test_frac", type=float, default=0.2,
+                   help="Fraction of TEST folder randomly sampled for test split.")
     p.add_argument("--seed", type=int, default=42)
     return p.parse_args()
 
@@ -19,60 +18,52 @@ def write_list(paths, out_path):
     with open(out_path, "w") as f:
         for p in paths:
             f.write(p + "\n")
-    print(f"Wrote {len(paths)} lines to {out_path}")
+    print(f"Wrote {len(paths)} -> {out_path}")
+
+def split_list(file_list, frac_train, seed):
+    random.seed(seed)
+    idx = list(range(len(file_list)))
+    random.shuffle(idx)
+    n_train = int(frac_train * len(file_list))
+    train = [file_list[i] for i in idx[:n_train]]
+    val = [file_list[i] for i in idx[n_train:]]
+    return train, val
+
+def sample_fraction(file_list, frac, seed):
+    random.seed(seed)
+    n = int(frac * len(file_list))
+    if n < 1:
+        n = 1
+    return random.sample(file_list, n)
 
 def main():
     args = parse_args()
-    random.seed(args.seed)
 
     if args.dataset == "retina":
-        # Expect official DRIVE structure:
-        #   root/training/images/*.tif
-        #   root/test/images/*.tif
+        # DRIVE layout
         train_img_dir = os.path.join(args.root, "training", "images")
         test_img_dir = os.path.join(args.root, "test", "images")
-
         train_imgs = sorted(glob.glob(os.path.join(train_img_dir, "*.*")))
-        test_imgs = sorted(glob.glob(os.path.join(test_img_dir, "*.*")))
-
-        if len(train_imgs) == 0 or len(test_imgs) == 0:
-            raise FileNotFoundError(
-                f"No images found. Expected DRIVE at {args.root} with training/images and test/images."
-            )
-
-        # Split training into train/val; keep official test as test.
-        indices = list(range(len(train_imgs)))
-        random.shuffle(indices)
-        n = len(indices)
-        n_train = int(args.train * n)
-        n_val = int(args.val * n)
-
-        train_paths = [train_imgs[i] for i in indices[:n_train]]
-        val_paths = [train_imgs[i] for i in indices[n_train:n_train+n_val]]
-        test_paths = test_imgs  # official test list, no shuffle
+        test_imgs_all = sorted(glob.glob(os.path.join(test_img_dir, "*.*")))
+        if not train_imgs or not test_imgs_all:
+            raise FileNotFoundError("Could not find DRIVE images. Check paths.")
+        train_paths, val_paths = split_list(train_imgs, args.train_frac, args.seed)
+        test_paths = sample_fraction(test_imgs_all, args.test_frac, args.seed)
 
         write_list(train_paths, os.path.join(args.output, "retina_train.txt"))
         write_list(val_paths, os.path.join(args.output, "retina_val.txt"))
         write_list(test_paths, os.path.join(args.output, "retina_test.txt"))
 
     else:
-        # Generic PhC-style: root/images, root/masks
-        img_dir = os.path.join(args.root, args.images_dir)
-        files = sorted(glob.glob(os.path.join(img_dir, "*.*")))
-        if len(files) == 0:
-            raise FileNotFoundError(
-                f"No images found under {img_dir}. Adjust --images_dir or root."
-            )
-
-        indices = list(range(len(files)))
-        random.shuffle(indices)
-        n = len(indices)
-        n_train = int(args.train * n)
-        n_val = int(args.val * n)
-
-        train_paths = [files[i] for i in indices[:n_train]]
-        val_paths = [files[i] for i in indices[n_train:n_train+n_val]]
-        test_paths = [files[i] for i in indices[n_train+n_val:]]
+        # phc_data layout: /train/images/*.jpg, /test/images/*.jpg
+        train_img_dir = os.path.join(args.root, "train", "images")
+        test_img_dir = os.path.join(args.root, "test", "images")
+        train_imgs = sorted(glob.glob(os.path.join(train_img_dir, "*.jpg")))
+        test_imgs_all = sorted(glob.glob(os.path.join(test_img_dir, "*.jpg")))
+        if not train_imgs or not test_imgs_all:
+            raise FileNotFoundError("Could not find PhC images. Check paths.")
+        train_paths, val_paths = split_list(train_imgs, args.train_frac, args.seed)
+        test_paths = sample_fraction(test_imgs_all, args.test_frac, args.seed)
 
         write_list(train_paths, os.path.join(args.output, "phc_train.txt"))
         write_list(val_paths, os.path.join(args.output, "phc_val.txt"))
