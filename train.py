@@ -72,7 +72,7 @@ def main():
         test_ds = RetinaDataset(test_paths, cfg["retina_root"], transform)
         is_retina = True
 
-    train_loader = DataLoader(train_ds, batch_size=cfg["batch_size"], shuffle=True, num_workers=4)
+    train_loader = DataLoader(train_ds, batch_size=cfg["batch_size"], shuffle=True, num_workers=0)
     val_loader = DataLoader(val_ds, batch_size=cfg["batch_size"], shuffle=False, num_workers=2)
     test_loader = DataLoader(test_ds, batch_size=cfg["batch_size"], shuffle=False, num_workers=2)
 
