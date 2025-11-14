@@ -4,35 +4,32 @@ from torch.utils.data import Dataset
 
 class PhCDataset(Dataset):
     """
-    Generic PhC dataset with filepaths split lists.
-    Expects images under some images_dir; masks under masks_dir with same filenames.
-    Example:
-      root/images/xxx.png
-      root/masks/xxx.png
-    Split files contain absolute image paths.
+    phc_data layout:
+      root/train/images/*.jpg
+      root/train/labels/*.jpg (or same extension)
+      root/test/images/*.jpg
+      root/test/labels/*.jpg
+    Split files contain absolute image paths pointing into train/images or test/images.
+    Label path is derived by replacing '/images/' with '/labels/'.
     """
-    def __init__(self, filepaths, images_root, masks_root, transform=None):
+    def __init__(self, filepaths, transform=None):
         self.filepaths = filepaths
-        self.images_root = images_root
-        self.masks_root = masks_root
         self.transform = transform
 
     def __len__(self):
         return len(self.filepaths)
 
-    def _mask_path_from_image(self, img_path):
-        # Replace images_root with masks_root and keep filename
-        fname = os.path.basename(img_path)
-        return os.path.join(self.masks_root, fname)
+    def _label_path(self, img_path):
+        return img_path.replace(os.sep + "images" + os.sep, os.sep + "labels" + os.sep)
 
     def __getitem__(self, idx):
         img_path = self.filepaths[idx]
-        mask_path = self._mask_path_from_image(img_path)
-        if not os.path.isfile(mask_path):
-            raise FileNotFoundError(f"Mask not found for {img_path}: {mask_path}")
+        label_path = self._label_path(img_path)
+        if not os.path.isfile(label_path):
+            raise FileNotFoundError(f"Label not found for image {img_path}: {label_path}")
 
         img = Image.open(img_path).convert("RGB")
-        mask = Image.open(mask_path).convert("L")
+        mask = Image.open(label_path).convert("L")
 
         if self.transform:
             img = self.transform(img)
