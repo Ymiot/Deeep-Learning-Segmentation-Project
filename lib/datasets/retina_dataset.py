@@ -13,11 +13,11 @@ class RetinaDataset(Dataset):
         """
         self.samples = []
         for line in file_list:
-            if len(parts) != 3:
-                raise ValueError(f"Expected 3 paths per line, got {len(parts)}: {line}")
+            if len(line) != 3:
+                raise ValueError(f"Expected 3 paths per line, got {len(line)}: {line}")
             if root:
-                parts = [os.path.join(root, os.path.relpath(p, start=root)) for p in parts]
-            self.samples.append(parts)
+                line = [os.path.join(root, os.path.relpath(p, start=root)) for p in line]
+            self.samples.append(line)
         self.transform = transform
 
     def __len__(self):
