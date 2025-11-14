@@ -13,8 +13,8 @@ def test_dataset(split_file, dataset_type="phc"):
     print(f"{dataset_type} dataset length: {len(ds)}")
     for i in range(min(5, len(ds))):
         sample = ds[i]
-        print(f"{i}: ", sample if dataset_type=="phc" else {k: v.size() for k,v in sample.items()})
-
-# Exemple
-test_dataset("splits/phc_train.txt", "phc")
-test_dataset("splits/retina_train.txt", "retina")
+        if dataset_type == "phc":
+            print(f"{i}: {sample}")
+        else:
+            # RetinaDataset retourne un dict
+            print(f"{i}: ", {k: v.size() for k,v in sample.items()})
