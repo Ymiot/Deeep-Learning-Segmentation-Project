@@ -34,8 +34,14 @@ def get_loss(name):
     raise ValueError(name)
 
 def load_paths(path):
+    triplets = []
     with open(path) as f:
-        return [line.strip() for line in f if line.strip()]
+        for line in f:
+            line = line.strip()
+            if line:
+                parts = [p.strip() for p in line.split(",")]
+                triplets.append(parts)
+    return triplets
 
 def main():
     args = parse_args()
