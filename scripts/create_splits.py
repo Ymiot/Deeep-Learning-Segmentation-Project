@@ -40,12 +40,11 @@ def sample_fraction(file_list, frac, seed):
 
 # --- Triplet builders ---
 def make_phc_triplet(img_path, root, subset):
-    # PHC layout: <root>/<subset>/images/*.jpg, labels in <root>/<subset>/labels/
-    base = os.path.basename(img_path)
-    # Assume label filename corresponds to image index
-    label_filename = "label_" + base.split('_')[-1]
-    mask_path = os.path.join(root, subset, "labels", label_filename)
-    label_path = mask_path  # mask = label
+    # img_path = .../train/images/img_00298.jpg
+    base = os.path.basename(img_path)             # img_00298.jpg
+    num = base.split('_')[1].split('.')[0]        # '00298'
+    mask_path = os.path.join(root, subset, "labels", f"label_{num}.png")
+    label_path = mask_path  # PHC n'a qu'un seul fichier de mask/label
     return img_path, mask_path, label_path
 
 def make_drive_triplet(img_path, root, train=True):
@@ -133,4 +132,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
