@@ -38,9 +38,7 @@ def main():
 
     if args.dataset == "phc":
         test_paths = load_paths("splits/phc_test.txt")
-        img_root = os.path.join(cfg["phc_root"], "images")
-        mask_root = os.path.join(cfg["phc_root"], "masks")
-        test_ds = PhCDataset(test_paths, img_root, mask_root, transform)
+        test_ds = PhCDataset(test_paths, transform=transform)
         is_retina = False
     else:
         test_paths = load_paths("splits/retina_test.txt")
