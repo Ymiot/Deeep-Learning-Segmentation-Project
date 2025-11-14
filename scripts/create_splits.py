@@ -90,7 +90,7 @@ def main():
             raise FileNotFoundError("Could not find DRIVE images. Check paths.")
 
         train_imgs_sel, val_imgs_sel = split_list(train_imgs, args.train_frac, args.seed)
-        test_imgs_sel = sample_fraction(test_imgs_all, args.test_frac, args.seed)
+        test_imgs_sel = test_imgs_all
 
         train_triplets, missing_train = collect_triplets(train_imgs_sel, "retina", args.root, "training")
         val_triplets, missing_val = collect_triplets(val_imgs_sel, "retina", args.root, "training")
@@ -116,7 +116,7 @@ def main():
             raise FileNotFoundError("Could not find PHC images. Check paths.")
 
         train_imgs_sel, val_imgs_sel = split_list(train_imgs, args.train_frac, args.seed)
-        test_imgs_sel = sample_fraction(test_imgs_all, args.test_frac, args.seed)
+        test_imgs_sel = test_imgs_all
 
         train_triplets, missing_train = collect_triplets(train_imgs_sel, "phc", args.root, "train")
         val_triplets, missing_val = collect_triplets(val_imgs_sel, "phc", args.root, "train")
@@ -133,3 +133,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
