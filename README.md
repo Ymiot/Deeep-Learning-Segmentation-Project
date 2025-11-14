@@ -1,63 +1,79 @@
 # Deep Learning Segmentation Project
 
-## Folder layout
+Minimal instructions for collaborators.
+
+## Dataset Assumptions
+
+Both datasets already have train/test folders:
+- DRIVE: /DRIVE/training/... and /DRIVE/test/...
+- PhC: /phc_data/train/images/*.jpg and /phc_data/train/labels/, plus /phc_data/test/images /phc_data/test/labels
+
+We build splits as:
+- From `train` folder: 80% → training, 20% → validation
+- From `test` folder: random 20% subset → test split (to keep evaluation light)
+
+Split files contain absolute image paths (one per line).
+
+## Structure
 ```
 .
-├── train.py            # Training script
-├── predict.py          # Inference on test split
-├── measure.py          # Compute Dice/IoU/Accuracy/Sensitivity/Specificity
+├── train.py
+├── predict.py
+├── measure.py
 ├── scripts/
-│   └── create_splits.py  # Create split files from dataset folders (writes filepaths)
-├── splits/             # Generated split lists (*.txt with filepaths)
+│   └── create_splits.py
+├── splits/
 ├── configs/
-│   └── default.yaml      # Hyperparameters + dataset roots
+│   └── default.yaml
 ├── lib/
 │   ├── datasets/
-│   │   ├── retina_dataset.py  # DRIVE layout support (training/test; 1st_manual; mask as FOV)
-│   │   └── phc_dataset.py     # Generic images/masks layout (filepaths-based)
-│   ├── model/                 # EncDec (baseline), UNet (optional)
+│   │   ├── retina_dataset.py
+│   │   └── phc_dataset.py
+│   ├── model/
+│   │   └── EncDecModel.py
 │   ├── losses.py
 │   ├── metrics.py
-│   └── utils.py (optional)
 └── requirements.txt
 ```
 
-## Quick start
-1) Install
-```
-pip install -r requirements.txt
-```
+## Create Splits
 
-2) Create splits (DRIVE official layout)
 ```
 python scripts/create_splits.py --dataset retina --root /dtu/datasets1/02516/DRIVE --output splits/
-# Optional (if you also use PhC):
-python scripts/create_splits.py --dataset phc --root /dtu/datasets1/02516/phc_data --output splits/ \
-  --images_dir images --masks_dir masks
+python scripts/create_splits.py --dataset phc --root /dtu/datasets1/02516/phc_data --output splits/
 ```
 
-3) Update config
-- Set `retina_root: /dtu/datasets1/02516/DRIVE`
-- (Optional) set `phc_root` if using PhC
+## Train (baseline EncDec)
 
-4) Train (baseline EncDec)
 ```
 python train.py --config configs/default.yaml --model encdec --dataset retina --loss bce
+python train.py --config configs/default.yaml --model encdec --dataset phc --loss bce
 ```
 
-5) Predict on test split
+## Predict
+
 ```
 python predict.py --checkpoint checkpoints/encdec_retina_best.pt --dataset retina --model encdec --out outputs/retina/test/
+python predict.py --checkpoint checkpoints/encdec_phc_best.pt --dataset phc --model encdec --out outputs/phc/test/
 ```
 
-6) Measure (for DRIVE include FOV to ignore black border)
+## Measure
+
+DRIVE (use FOV):
 ```
 python measure.py --pred outputs/retina/test/ \
   --gt /dtu/datasets1/02516/DRIVE/test/1st_manual/ \
   --fov /dtu/datasets1/02516/DRIVE/test/mask/
 ```
 
-Notes
-- Splits contain filepaths to images; datasets derive vessel and FOV masks from DRIVE naming rules.
-- Baseline simple model (EncDec) is preserved.
-- If your PhC folder differs, pass `--images_dir` and `--masks_dir` to the split script.
+PhC:
+```
+python measure.py --pred outputs/phc/test/ \
+  --gt /dtu/datasets1/02516/phc_data/test/labels/
+```
+
+## Notes
+
+- Test subset is a random 20% of official test images (reproducible via seed).
+- Labels for PhC are derived by replacing `/images/` with `/labels/` and keeping filename.
+- Keep the EncDec model as baseline for loss ablation.
