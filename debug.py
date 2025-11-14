@@ -1,30 +1,20 @@
-import os
-import glob
+from lib.datasets.retina_dataset import RetinaDataset
+from lib.datasets.phc_dataset import PhCDataset
 
-SPLIT_DIR = "splits"
-
-def check_split_file(file_path, max_lines=10):
-    print(f"\nChecking file: {file_path}")
-    if not os.path.exists(file_path):
-        print("  -> File does not exist!")
-        return
-    
-    with open(file_path) as f:
+def test_dataset(split_file, dataset_type="phc"):
+    with open(split_file) as f:
         lines = [line.strip() for line in f if line.strip()]
-    
-    print(f"Total lines: {len(lines)}")
-    
-    for i, line in enumerate(lines[:max_lines]):
-        paths = [p.strip() for p in line.split(",")]
-        exists = [os.path.exists(p) for p in paths]
-        print(f"{i+1}. {paths} -> exists: {exists}")
-    
-    print(f"All checked files exist for first {min(max_lines, len(lines))} lines of {os.path.basename(file_path)}")
 
-def main():
-    split_files = glob.glob(os.path.join(SPLIT_DIR, "*.txt"))
-    for f in split_files:
-        check_split_file(f)
+    if dataset_type == "phc":
+        ds = PhCDataset(lines)
+    else:
+        ds = RetinaDataset(lines)
 
-if __name__ == "__main__":
-    main()
+    print(f"{dataset_type} dataset length: {len(ds)}")
+    for i in range(min(5, len(ds))):
+        sample = ds[i]
+        print(f"{i}: ", sample if dataset_type=="phc" else {k: v.size() for k,v in sample.items()})
+
+# Exemple
+test_dataset("splits/phc_train.txt", "phc")
+test_dataset("splits/retina_train.txt", "retina")
