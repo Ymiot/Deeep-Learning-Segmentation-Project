@@ -6,4 +6,4 @@ lr: 0.0005
 unet_base: 32
 unet_depth: 4
 retina_root: /dtu/datasets1/02516/DRIVE
-phc_root: /dtu/datasets1/02516/PH2_Dataset_images
+phc_root: /dtu/datasets1/02516/phc_data
