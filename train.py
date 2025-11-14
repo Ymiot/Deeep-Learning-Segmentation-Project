@@ -65,7 +65,9 @@ def main():
         is_retina = False
     else:
         train_paths = load_paths("splits/retina_train.txt")
+        print("TRAIN PATHS SAMPLE:", train_paths[:10])
         val_paths = load_paths("splits/retina_val.txt")
+        print("VAL PATHS SAMPLE:", val_paths[:10])
         test_paths = load_paths("splits/retina_test.txt")
         train_ds = RetinaDataset(train_paths, cfg["retina_root"], transform)
         val_ds = RetinaDataset(val_paths, cfg["retina_root"], transform)
@@ -73,8 +75,8 @@ def main():
         is_retina = True
 
     train_loader = DataLoader(train_ds, batch_size=cfg["batch_size"], shuffle=True, num_workers=0)
-    val_loader = DataLoader(val_ds, batch_size=cfg["batch_size"], shuffle=False, num_workers=2)
-    test_loader = DataLoader(test_ds, batch_size=cfg["batch_size"], shuffle=False, num_workers=2)
+    val_loader = DataLoader(val_ds, batch_size=cfg["batch_size"], shuffle=True, num_workers=0)
+    test_loader = DataLoader(test_ds, batch_size=cfg["batch_size"], shuffle=True, num_workers=0)
 
     if args.model == "encdec":
         model = EncDec()
