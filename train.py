@@ -14,6 +14,8 @@ from lib.metrics import compute_all
 from lib.datasets.phc_dataset import PhCDataset
 from lib.datasets.retina_dataset import RetinaDataset
 
+import torch.nn.functional as F
+
 def parse_args():
     p = argparse.ArgumentParser()
     p.add_argument("--config", type=str, default="configs/default.yaml")
