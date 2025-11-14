@@ -16,11 +16,16 @@ def parse_args():
     parser.add_argument("--seed", type=int, default=42)
     return parser.parse_args()
 
-def write_triplets(triplets, out_path):
+def write_triplets(triplets, out_path, dataset):
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     with open(out_path, "w") as f:
-        for img_path, mask_path, label_path in triplets:
-            f.write(",".join([img_path, mask_path, label_path]) + "\n")
+        for t in triplets:
+            if dataset == "phc":
+                img_path, label_path = t
+                f.write(",".join([img_path, label_path]) + "\n")
+            else:
+                img_path, mask_path, label_path = t
+                f.write(",".join([img_path, mask_path, label_path]) + "\n")
     print(f"Wrote {len(triplets)} triplets -> {out_path}")
 
 def split_list(file_list, frac_train, seed):
@@ -40,15 +45,12 @@ def sample_fraction(file_list, frac, seed):
 
 # --- Triplet builders ---
 def make_phc_triplet(img_path, root, subset):
-    # img_path = .../train/images/img_00298.jpg
     base = os.path.basename(img_path)             # img_00298.jpg
     num = base.split('_')[1].split('.')[0]        # '00298'
-    mask_path = os.path.join(root, subset, "labels", f"label_{num}.png")
-    label_path = mask_path  # PHC n'a qu'un seul fichier de mask/label
-    return img_path, mask_path, label_path
+    label_path = os.path.join(root, subset, "labels", f"label_{num}.png")
+    return img_path, label_path  # PHC n'a qu'un seul fichier de label
 
 def make_drive_triplet(img_path, root, train=True):
-    # DRIVE layout: training/images/*.tif, training/mask/*.gif, test/images/*.tif, test/mask/*.gif
     stem = os.path.splitext(os.path.basename(img_path))[0]
     mask_path = os.path.join(root, "training" if train else "test", "mask", stem + "_mask.gif")
     label_path = mask_path  # mask = label
@@ -59,21 +61,30 @@ def collect_triplets(img_paths, dataset, root, subset):
     missing = []
     for img in img_paths:
         if dataset == "phc":
-            img_p, mask_p, label_p = make_phc_triplet(img, root, subset)
+            img_p, label_p = make_phc_triplet(img, root, subset)
+            ok = True
+            if not os.path.exists(img_p):
+                ok = False
+                missing.append(("image", img_p))
+            if not os.path.exists(label_p):
+                ok = False
+                missing.append(("label", label_p))
+            if ok:
+                triplets.append((img_p, label_p))
         else:
             img_p, mask_p, label_p = make_drive_triplet(img, root, train=(subset=="training"))
-        ok = True
-        if not os.path.exists(img_p):
-            ok = False
-            missing.append(("image", img_p))
-        if not os.path.exists(mask_p):
-            ok = False
-            missing.append(("mask", mask_p))
-        if label_p and not os.path.exists(label_p):
-            ok = False
-            missing.append(("label", label_p))
-        if ok:
-            triplets.append((img_p, mask_p, label_p))
+            ok = True
+            if not os.path.exists(img_p):
+                ok = False
+                missing.append(("image", img_p))
+            if not os.path.exists(mask_p):
+                ok = False
+                missing.append(("mask", mask_p))
+            if not os.path.exists(label_p):
+                ok = False
+                missing.append(("label", label_p))
+            if ok:
+                triplets.append((img_p, mask_p, label_p))
     return triplets, missing
 
 def main():
@@ -100,9 +111,9 @@ def main():
             for m in missing_train + missing_val + missing_test:
                 print(m)
 
-        write_triplets(train_triplets, os.path.join(args.output, "retina_train.txt"))
-        write_triplets(val_triplets, os.path.join(args.output, "retina_val.txt"))
-        write_triplets(test_triplets, os.path.join(args.output, "retina_test.txt"))
+        write_triplets(train_triplets, os.path.join(args.output, "retina_train.txt"), dataset="retina")
+        write_triplets(val_triplets, os.path.join(args.output, "retina_val.txt"), dataset="retina")
+        write_triplets(test_triplets, os.path.join(args.output, "retina_test.txt"), dataset="retina")
 
     else:
         # PHC layout
@@ -126,11 +137,9 @@ def main():
             for m in missing_train + missing_val + missing_test:
                 print(m)
 
-        write_triplets(train_triplets, os.path.join(args.output, "phc_train.txt"))
-        write_triplets(val_triplets, os.path.join(args.output, "phc_val.txt"))
-        write_triplets(test_triplets, os.path.join(args.output, "phc_test.txt"))
+        write_triplets(train_triplets, os.path.join(args.output, "phc_train.txt"), dataset="phc")
+        write_triplets(val_triplets, os.path.join(args.output, "phc_val.txt"), dataset="phc")
+        write_triplets(test_triplets, os.path.join(args.output, "phc_test.txt"), dataset="phc")
 
 if __name__ == "__main__":
     main()
-
-
