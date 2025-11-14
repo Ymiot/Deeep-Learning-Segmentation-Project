@@ -69,7 +69,7 @@ def main():
     test_loader = DataLoader(test_ds, batch_size=cfg["batch_size"], shuffle=False, num_workers=2)
 
     if args.model == "encdec":
-        model = EncDec(in_channels=3)
+        model = EncDec()
     else:
         model = UNet(in_channels=3, out_channels=1, base=cfg["unet_base"], depth=cfg["unet_depth"])
 
