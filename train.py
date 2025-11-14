@@ -51,11 +51,9 @@ def main():
         train_paths = load_paths("splits/phc_train.txt")
         val_paths = load_paths("splits/phc_val.txt")
         test_paths = load_paths("splits/phc_test.txt")
-        img_root = os.path.join(cfg["phc_root"], "images")
-        mask_root = os.path.join(cfg["phc_root"], "masks")
-        train_ds = PhCDataset(train_paths, img_root, mask_root, transform)
-        val_ds = PhCDataset(val_paths, img_root, mask_root, transform)
-        test_ds = PhCDataset(test_paths, img_root, mask_root, transform)
+        train_ds = PhCDataset(train_paths, transform=transform)
+        val_ds = PhCDataset(val_paths, transform=transform)
+        test_ds = PhCDataset(test_paths, transform=transform)
         is_retina = False
     else:
         train_paths = load_paths("splits/retina_train.txt")
@@ -103,7 +101,6 @@ def main():
             opt.step()
             epoch_loss += loss.item()
 
-        # Validation
         model.eval()
         val_metrics = []
         with torch.no_grad():
@@ -117,13 +114,12 @@ def main():
                     imgs = imgs.to(args.device)
                     masks = masks.to(args.device)
                     fov = None
-
                 logits = model(imgs)
                 probs = torch.sigmoid(logits)
                 for i in range(probs.shape[0]):
-                    mask_sel = masks[i]
                     pred_sel = probs[i]
-                    fov_sel = fov[i] if (is_retina and fov is not None) else None
+                    mask_sel = masks[i]
+                    fov_sel = fov[i] if fov is not None else None
                     m = compute_all(pred_sel, mask_sel, mask=(fov_sel == 1) if fov_sel is not None else None)
                     val_metrics.append({k: v.item() for k,v in m.items()})
 
