@@ -13,7 +13,6 @@ class RetinaDataset(Dataset):
         """
         self.samples = []
         for line in file_list:
-            parts = line.split(",")
             if len(parts) != 3:
                 raise ValueError(f"Expected 3 paths per line, got {len(parts)}: {line}")
             if root:
