@@ -2,6 +2,7 @@ import torch
 from torch.utils.data import Dataset
 from PIL import Image
 import os
+from torchvision import transforms
 
 class RetinaDataset(Dataset):
     """Dataset pour DRIVE/retina segmentation."""
