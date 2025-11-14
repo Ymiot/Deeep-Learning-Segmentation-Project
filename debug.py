@@ -1,24 +1,30 @@
 import os
 import glob
 
-split_dir = "splits"
-split_files = glob.glob(os.path.join(split_dir, "*.txt"))
+SPLIT_DIR = "splits"
 
-for split_file in split_files:
-    print(f"\nChecking file: {split_file}")
-    with open(split_file, "r") as f:
-        lines = f.readlines()
-
+def check_split_file(file_path, max_lines=10):
+    print(f"\nChecking file: {file_path}")
+    if not os.path.exists(file_path):
+        print("  -> File does not exist!")
+        return
+    
+    with open(file_path) as f:
+        lines = [line.strip() for line in f if line.strip()]
+    
     print(f"Total lines: {len(lines)}")
-    missing = 0
-    for i, line in enumerate(lines[:10]):  # affiche les 10 premières lignes
-        paths = line.strip().split(",")
-        exists_list = [os.path.exists(p) for p in paths]
-        print(f"{i+1}. {paths} -> exists: {exists_list}")
-        if not all(exists_list):
-            missing += 1
+    
+    for i, line in enumerate(lines[:max_lines]):
+        paths = [p.strip() for p in line.split(",")]
+        exists = [os.path.exists(p) for p in paths]
+        print(f"{i+1}. {paths} -> exists: {exists}")
+    
+    print(f"All checked files exist for first {min(max_lines, len(lines))} lines of {os.path.basename(file_path)}")
 
-    if missing > 0:
-        print(f"Warning: {missing} line(s) have missing files in {split_file}")
-    else:
-        print(f"All checked files exist for first 10 lines of {split_file}")
+def main():
+    split_files = glob.glob(os.path.join(SPLIT_DIR, "*.txt"))
+    for f in split_files:
+        check_split_file(f)
+
+if __name__ == "__main__":
+    main()
