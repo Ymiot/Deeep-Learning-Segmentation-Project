@@ -32,7 +32,9 @@ class RetinaDataset(Dataset):
 
         if self.transform:
             img = self.transform(img)
-            mask = self.transform(mask)
-            fov = self.transform(fov)
+            mask = transforms.Resize((128, 128))(mask)
+            fov = transforms.Resize((128, 128))(fov)
+            mask = transforms.ToTensor()(mask)
+            fov = transforms.ToTensor()(fov)
 
         return {"image": img, "mask": mask, "fov": fov}
