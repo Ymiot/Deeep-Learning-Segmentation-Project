@@ -18,3 +18,11 @@ def test_dataset(split_file, dataset_type="phc"):
         else:
             # RetinaDataset retourne un dict
             print(f"{i}: ", {k: v.size() for k,v in sample.items()})
+
+# --- Appel de test ---
+if __name__ == "__main__":
+    print("=== PHC dataset test ===")
+    test_dataset("splits/phc_train.txt", "phc")
+
+    print("\n=== Retina dataset test ===")
+    test_dataset("splits/retina_train.txt", "retina")
