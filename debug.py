@@ -10,6 +10,7 @@ def test_dataset(split_file, dataset_type="phc"):
     else:
         ds = RetinaDataset(lines)
 
+    print(f"=== {dataset_type.upper()} dataset test ===")
     print(f"{dataset_type} dataset length: {len(ds)}")
     for i in range(min(5, len(ds))):
         sample = ds[i]
@@ -17,7 +18,7 @@ def test_dataset(split_file, dataset_type="phc"):
             print(f"{i}: {sample}")
         else:
             # RetinaDataset retourne un dict
-            print(f"{i}: ", {k: v.size() for k,v in sample.items()})
+            print(f"{i}: ", {k: v.size for k,v in sample.items()})
 
 # --- Appel de test ---
 if __name__ == "__main__":
