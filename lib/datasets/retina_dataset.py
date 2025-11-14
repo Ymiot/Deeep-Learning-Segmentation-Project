@@ -1,20 +1,18 @@
 import os
 from PIL import Image
 from torch.utils.data import Dataset
-import torchvision.transforms.functional as TF
 
 class RetinaDataset(Dataset):
     """
-    DRIVE-compatible dataset:
+    DRIVE layout:
       root/training/images/*.tif
-      root/training/1st_manual/*.gif     (vessel labels)
-      root/training/mask/*.gif           (FOV masks)
+      root/training/1st_manual/XX_manual1.gif
+      root/training/mask/XX_training_mask.gif
       root/test/images/*.tif
-      root/test/1st_manual/*.gif
-      root/test/mask/*.gif
-
-    Split files contain absolute paths to images (one per line).
-    We derive corresponding vessel + FOV paths from DRIVE naming rules.
+      root/test/1st_manual/XX_manual1.gif
+      root/test/mask/XX_test_mask.gif
+    Split files contain absolute image paths inside training/images or test/images.
+    Test subset is sampled (20% by script).
     """
     def __init__(self, filepaths, root, transform=None):
         self.filepaths = filepaths
@@ -25,43 +23,34 @@ class RetinaDataset(Dataset):
         return len(self.filepaths)
 
     @staticmethod
-    def _drive_id_from_filename(fname):
-        # E.g. 01_training.tif or 01_test.tif -> "01"
-        # Assumes filenames start with two digits
+    def _drive_id(fname):
         return os.path.basename(fname)[:2]
 
     @staticmethod
-    def _split_from_path(path):
-        return "training" if f"{os.sep}training{os.sep}" in path else "test"
+    def _is_training(path):
+        return f"{os.sep}training{os.sep}" in path
 
-    def _derive_paths(self, img_path):
-        split = self._split_from_path(img_path)
-        two = self._drive_id_from_filename(img_path)
-
+    def _paths(self, img_path):
+        is_train = self._is_training(img_path)
+        two = self._drive_id(img_path)
+        split = "training" if is_train else "test"
         vessel_dir = os.path.join(self.root, split, "1st_manual")
         fov_dir = os.path.join(self.root, split, "mask")
-
-        # Vessel labels follow: 01_manual1.gif
-        vessel_name = f"{two}_manual1.gif"
-        vessel_path = os.path.join(vessel_dir, vessel_name)
-
-        # FOV follows: 01_training_mask.gif or 01_test_mask.gif
-        suffix = "training" if split == "training" else "test"
-        fov_name = f"{two}_{suffix}_mask.gif"
-        fov_path = os.path.join(fov_dir, fov_name)
-
-        if not os.path.isfile(vessel_path):
-            raise FileNotFoundError(f"Vessel mask not found: {vessel_path}")
-        if not os.path.isfile(fov_path):
-            raise FileNotFoundError(f"FOV mask not found: {fov_path}")
-        return vessel_path, fov_path
+        vessel = os.path.join(vessel_dir, f"{two}_manual1.gif")
+        suffix = "training" if is_train else "test"
+        fov = os.path.join(fov_dir, f"{two}_{suffix}_mask.gif")
+        if not os.path.isfile(vessel):
+            raise FileNotFoundError(f"Vessel mask missing: {vessel}")
+        if not os.path.isfile(fov):
+            raise FileNotFoundError(f"FOV mask missing: {fov}")
+        return vessel, fov
 
     def __getitem__(self, idx):
         img_path = self.filepaths[idx]
         img = Image.open(img_path).convert("RGB")
-        vessel_path, fov_path = self._derive_paths(img_path)
-        vessel = Image.open(vessel_path).convert("L")  # binary vessel label
-        fov = Image.open(fov_path).convert("L")        # binary FOV mask
+        vessel_path, fov_path = self._paths(img_path)
+        vessel = Image.open(vessel_path).convert("L")
+        fov = Image.open(fov_path).convert("L")
 
         if self.transform:
             img = self.transform(img)
