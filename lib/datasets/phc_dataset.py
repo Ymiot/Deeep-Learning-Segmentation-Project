@@ -1,39 +1,29 @@
-import os
-from PIL import Image
+import torch
 from torch.utils.data import Dataset
+from PIL import Image
 
 class PhCDataset(Dataset):
-    """
-    phc_data layout:
-      root/train/images/*.jpg
-      root/train/labels/*.jpg (or same extension)
-      root/test/images/*.jpg
-      root/test/labels/*.jpg
-    Split files contain absolute image paths pointing into train/images or test/images.
-    Label path is derived by replacing '/images/' with '/labels/'.
-    """
-    def __init__(self, filepaths, transform=None):
-        self.filepaths = filepaths
+    def __init__(self, lines, transform=None):
+        self.samples = []
+        for line in lines:
+            paths = line.strip().split(",")
+            if len(paths) != 2:
+                raise ValueError(f"Expected 2 paths per line, got {paths}")
+            img_path, mask_path = paths
+            self.samples.append((img_path, mask_path))
         self.transform = transform
 
     def __len__(self):
-        return len(self.filepaths)
-
-    def _label_path(self, img_path):
-        return img_path.replace(os.sep + "images" + os.sep, os.sep + "labels" + os.sep)
+        return len(self.samples)
 
     def __getitem__(self, idx):
-        img_path = self.filepaths[idx]
-        label_path = self._label_path(img_path)
-        if not os.path.isfile(label_path):
-            raise FileNotFoundError(f"Label not found for image {img_path}: {label_path}")
+        img_path, mask_path = self.samples[idx]
 
         img = Image.open(img_path).convert("RGB")
-        mask = Image.open(label_path).convert("L")
+        mask = Image.open(mask_path).convert("L")
 
         if self.transform:
             img = self.transform(img)
             mask = self.transform(mask)
 
-        mask = (mask > 0.5).float()
         return img, mask
