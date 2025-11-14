@@ -141,4 +141,5 @@ def main():
                 print(m)
 
         write_triplets(train_triplets, os.path.join(args.output, "phc_train.txt"))
-        write_triplets(val_triplets, os.path.join(args.output, "phc_val.txt
+        write_triplets(val_triplets, os.path.join(args.output, "phc_val.txt"))
+
