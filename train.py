@@ -17,9 +17,9 @@ from lib.datasets.retina_dataset import RetinaDataset
 def parse_args():
     p = argparse.ArgumentParser()
     p.add_argument("--config", type=str, default="configs/default.yaml")
-    p.add_argument("--model", type=str, choices=["encdec","unet"], default="unet")
+    p.add_argument("--model", type=str, choices=["encdec","unet"], default="encdec")
     p.add_argument("--loss", type=str, choices=["bce","dice","focal","bce_weighted","bce_tv"], default="bce")
-    p.add_argument("--dataset", type=str, choices=["phc","retina"], default="phc")
+    p.add_argument("--dataset", type=str, choices=["phc","retina"], default="retina")
     p.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu")
     return p.parse_args()
 
@@ -31,9 +31,9 @@ def get_loss(name):
     if name == "bce_tv": return BCELoss_TotalVariation(tv_weight=1e-4)
     raise ValueError(name)
 
-def load_indices(path):
+def load_paths(path):
     with open(path) as f:
-        return [int(x.strip()) for x in f.readlines()]
+        return [line.strip() for line in f if line.strip()]
 
 def main():
     args = parse_args()
@@ -48,20 +48,22 @@ def main():
     ])
 
     if args.dataset == "phc":
-        train_idx = load_indices("splits/phc_train.txt")
-        val_idx = load_indices("splits/phc_val.txt")
-        test_idx = load_indices("splits/phc_test.txt")
-        train_ds = PhCDataset(cfg["phc_root"], train_idx, transform)
-        val_ds = PhCDataset(cfg["phc_root"], val_idx, transform)
-        test_ds = PhCDataset(cfg["phc_root"], test_idx, transform)
+        train_paths = load_paths("splits/phc_train.txt")
+        val_paths = load_paths("splits/phc_val.txt")
+        test_paths = load_paths("splits/phc_test.txt")
+        img_root = os.path.join(cfg["phc_root"], "images")
+        mask_root = os.path.join(cfg["phc_root"], "masks")
+        train_ds = PhCDataset(train_paths, img_root, mask_root, transform)
+        val_ds = PhCDataset(val_paths, img_root, mask_root, transform)
+        test_ds = PhCDataset(test_paths, img_root, mask_root, transform)
         is_retina = False
     else:
-        train_idx = load_indices("splits/retina_train.txt")
-        val_idx = load_indices("splits/retina_val.txt")
-        test_idx = load_indices("splits/retina_test.txt")
-        train_ds = RetinaDataset(cfg["retina_root"], train_idx, transform)
-        val_ds = RetinaDataset(cfg["retina_root"], val_idx, transform)
-        test_ds = RetinaDataset(cfg["retina_root"], test_idx, transform)
+        train_paths = load_paths("splits/retina_train.txt")
+        val_paths = load_paths("splits/retina_val.txt")
+        test_paths = load_paths("splits/retina_test.txt")
+        train_ds = RetinaDataset(train_paths, cfg["retina_root"], transform)
+        val_ds = RetinaDataset(val_paths, cfg["retina_root"], transform)
+        test_ds = RetinaDataset(test_paths, cfg["retina_root"], transform)
         is_retina = True
 
     train_loader = DataLoader(train_ds, batch_size=cfg["batch_size"], shuffle=True, num_workers=4)
@@ -101,7 +103,7 @@ def main():
             opt.step()
             epoch_loss += loss.item()
 
-        # Validation phase
+        # Validation
         model.eval()
         val_metrics = []
         with torch.no_grad():
