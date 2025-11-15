@@ -52,8 +52,15 @@ def make_phc_triplet(img_path, root, subset):
 
 def make_drive_triplet(img_path, root, train=True):
     stem = os.path.splitext(os.path.basename(img_path))[0]
-    mask_path = os.path.join(root, "training" if train else "test", "mask", stem + "_mask.gif")
-    label_path = mask_path  # mask = label
+    id_part = stem.split("_")[0]
+
+    if train:
+        mask_path  = os.path.join(root, "training", "mask",       f"{id_part}_training_mask.gif")
+        label_path = os.path.join(root, "training", "1st_manual", f"{id_part}_manual1.gif")
+    else:
+        mask_path  = os.path.join(root, "test", "mask",       f"{id_part}_test_mask.gif")
+        label_path = os.path.join(root, "test", "1st_manual", f"{id_part}_manual1.gif")
+
     return img_path, mask_path, label_path
 
 def collect_triplets(img_paths, dataset, root, subset):
@@ -62,31 +69,23 @@ def collect_triplets(img_paths, dataset, root, subset):
     for img in img_paths:
         if dataset == "phc":
             img_p, label_p = make_phc_triplet(img, root, subset)
-            ok = True
-            if not os.path.exists(img_p):
-                ok = False
-                missing.append(("image", img_p))
-            if not os.path.exists(label_p):
-                ok = False
-                missing.append(("label", label_p))
-            if ok:
-                triplets.append((img_p, label_p))
+            ok = os.path.exists(img_p) and os.path.exists(label_p)
+            if ok: triplets.append((img_p, label_p))
+            else:
+                if not os.path.exists(img_p): missing.append(("image", img_p))
+                if not os.path.exists(label_p): missing.append(("label", label_p))
+
         else:
             img_p, mask_p, label_p = make_drive_triplet(img, root, train=(subset=="training"))
-            ok = True
-            if not os.path.exists(img_p):
-                ok = False
-                missing.append(("image", img_p))
-            if not os.path.exists(mask_p):
-                ok = False
-                missing.append(("mask", mask_p))
-            if not os.path.exists(label_p):
-                ok = False
-                missing.append(("label", label_p))
-            if ok:
-                triplets.append((img_p, mask_p, label_p))
-    return triplets, missing
+            ok = os.path.exists(img_p) and os.path.exists(mask_p) and os.path.exists(label_p)
+            if ok: triplets.append((img_p, mask_p, label_p))
+            else:
+                if not os.path.exists(img_p): missing.append(("image", img_p))
+                if not os.path.exists(mask_p): missing.append(("FOV mask", mask_p))
+                if not os.path.exists(label_p): missing.append(("vessel label", label_p))
 
+    return triplets, missing
+    
 def main():
     args = parse_args()
     
@@ -143,3 +142,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
