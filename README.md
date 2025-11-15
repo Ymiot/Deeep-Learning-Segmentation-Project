@@ -58,8 +58,8 @@ python predict.py --config configs/default.yaml --model encdec --dataset phc --c
 ```
 To visualize : 
 ```
-python predict.py --config configs/default.yaml --model encdec --dataset retina --checkpoint checkpoints/encdec_retina_best.pt --out outputs/retina/test/ --show --num_show 5
-python predict.py --config configs/default.yaml --model encdec --dataset phc --checkpoint checkpoints/encdec_phc_best.pt --out outputs/phc/test/ --show --num_show 5
+python predict.py --config configs/default.yaml --model encdec --dataset retina --checkpoint checkpoints/encdec_retina_best.pt --out outputs/retina/test/ --visualize
+python predict.py --config configs/default.yaml --model encdec --dataset phc --checkpoint checkpoints/encdec_phc_best.pt --out outputs/phc/test/ --visualize
 ```
 ## Measure
 
