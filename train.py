@@ -111,7 +111,38 @@ def main():
             opt.step()
             epoch_loss += loss.item()
 
+        # -------------------------
+        # Compute metrics on TRAIN split
+        # -------------------------
         model.eval()
+        train_metrics = []
+        with torch.no_grad():
+            for batch in train_loader:
+                if is_retina:
+                    imgs = batch["image"].to(args.device)
+                    masks = batch["mask"].to(args.device)
+                    fov = batch["fov"].to(args.device)
+                else:
+                    imgs, masks = batch
+                    imgs = imgs.to(args.device)
+                    masks = masks.to(args.device)
+                    fov = None
+                logits = model(imgs)
+                probs = torch.sigmoid(logits)
+                for i in range(probs.shape[0]):
+                    pred_sel = probs[i]
+                    mask_sel = masks[i]
+                    if fov is not None:
+                        fov_sel = fov[i]
+                        m = compute_all(pred_sel, mask_sel, mask=(fov_sel > 0))
+                    else:
+                        m = compute_all(pred_sel, mask_sel, mask=None)
+                    train_metrics.append({k: v.item() for k, v in m.items()})
+        avg_train = {k: np.mean([m[k] for m in train_metrics]) for k in train_metrics[0].keys()}
+
+        # -------------------------
+        # Compute metrics on VAL split
+        # -------------------------
         val_metrics = []
         with torch.no_grad():
             for batch in val_loader:
@@ -134,12 +165,14 @@ def main():
                         m = compute_all(pred_sel, mask_sel, mask=(fov_sel > 0))
                     else:
                         m = compute_all(pred_sel, mask_sel, mask=None)
-                    val_metrics.append({k: v.item() for k,v in m.items()})
-
+                    val_metrics.append({k: v.item() for k, v in m.items()})
         avg_val = {k: np.mean([m[k] for m in val_metrics]) for k in val_metrics[0].keys()}
+
         dice_val = avg_val["dice"]
-        metric_str = " ".join([f"{k}={v:.4f}" for k, v in avg_val.items()])
-        print(f"Epoch {epoch+1}/{cfg['epochs']} TrainLoss={epoch_loss/len(train_loader):.4f} {metric_str}")
+        train_str = " ".join([f"{k}={v:.4f}" for k, v in avg_train.items()])
+        val_str = " ".join([f"{k}={v:.4f}" for k, v in avg_val.items()])
+        print(f"Epoch {epoch+1}/{cfg['epochs']} TrainLoss={epoch_loss/len(train_loader):.4f} "
+              f"TRAIN: {train_str} VAL: {val_str}")
 
         if dice_val > best_val_dice:
             best_val_dice = dice_val
