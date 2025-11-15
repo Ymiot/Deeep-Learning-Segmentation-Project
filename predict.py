@@ -22,7 +22,8 @@ def parse_args():
     p.add_argument("--checkpoint", type=str, required=True)
     p.add_argument("--out", type=str, default="outputs/test/")
     p.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu")
-    p.add_argument("--visualize", action="store_true", help="Show predictions during testing")
+    p.add_argument("--show", action="store_true", help="Display a few predictions with matplotlib")
+    p.add_argument("--num_show", type=int, default=5, help="Number of images to show")
     return p.parse_args()
 
 def load_paths(path):
@@ -43,7 +44,7 @@ def main():
     torch.manual_seed(cfg["seed"])
     size = cfg["image_size"]
     transform = transforms.Compose([
-        transforms.Resize((size, size)),
+        transforms.Resize((size,size)),
         transforms.ToTensor()
     ])
 
@@ -97,25 +98,31 @@ def main():
                     m = compute_all(pred_sel, mask_sel, mask=(fov_sel > 0))
                 else:
                     m = compute_all(pred_sel, mask_sel, mask=None)
+                all_metrics.append({k: v.item() for k,v in m.items()})
 
-                all_metrics.append({k: v.item() for k, v in m.items()})
-
-                # Convert prediction to image
-                pred_img = (pred_sel.cpu().numpy() > 0.5).astype(np.uint8) * 255  # Binarize and scale to 0-255
-                pred_img = np.squeeze(pred_img)  # remove channel dimension [1,H,W] -> [H,W]
+                # Save prediction
+                pred_img = (pred_sel.cpu().numpy() * 255).astype(np.uint8)
+                if pred_img.ndim == 2:
+                    pred_img = pred_img.squeeze()
+                pred_img_pil = Image.fromarray(pred_img)
                 img_name = f"pred_{idx*probs.shape[0]+i}.png"
-                Image.fromarray(pred_img).save(os.path.join(args.out, img_name))
+                pred_img_pil.save(os.path.join(args.out, img_name))
 
-                if args.visualize:
-                    plt.figure(figsize=(10,5))
-                    plt.subplot(1,2,1)
-                    plt.title("Ground Truth")
-                    plt.imshow(mask_sel.cpu().numpy().squeeze(), cmap="gray")
-                    plt.axis("off")
-                    plt.subplot(1,2,2)
-                    plt.title("Prediction")
-                    plt.imshow(pred_img, cmap="gray")
-                    plt.axis("off")
+                # Optional: show images
+                if args.show and idx < args.num_show:
+                    img_display = imgs[i].cpu().permute(1,2,0).numpy()
+                    mask_display = mask_sel.cpu().numpy().squeeze()
+                    pred_display = pred_sel.cpu().numpy().squeeze()
+                    fig, axes = plt.subplots(1,3, figsize=(12,4))
+                    axes[0].imshow(img_display)
+                    axes[0].set_title("Input image")
+                    axes[0].axis('off')
+                    axes[1].imshow(mask_display, cmap='gray')
+                    axes[1].set_title("Ground truth")
+                    axes[1].axis('off')
+                    axes[2].imshow(pred_display, cmap='gray')
+                    axes[2].set_title("Prediction")
+                    axes[2].axis('off')
                     plt.show()
 
     avg_metrics = {k: np.mean([m[k] for m in all_metrics]) for k in all_metrics[0].keys()}
