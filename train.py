@@ -14,6 +14,8 @@ from lib.metrics import compute_all
 from lib.datasets.phc_dataset import PhCDataset
 from lib.datasets.retina_dataset import RetinaDataset
 
+import torch.nn.functional as F
+
 def parse_args():
     p = argparse.ArgumentParser()
     p.add_argument("--config", type=str, default="configs/default.yaml")
@@ -29,10 +31,9 @@ def get_loss(name):
     if name == "focal": return FocalLoss()
     if name == "bce_weighted": return BCELoss(weight_pos=3.0)
     if name == "bce_tv": return BCELoss_TotalVariation(tv_weight=1e-4)
-    raise ValueError(f"Unknown loss: {name}")
+    raise ValueError(name)
 
 def load_paths(path):
-    """Charge les chemins depuis un fichier split."""
     triplets = []
     with open(path) as f:
         for line in f:
@@ -42,59 +43,54 @@ def load_paths(path):
                 triplets.append(parts)
     return triplets
 
-def build_dataset(dataset_name, split_paths, cfg):
-    if dataset_name == "phc":
-        train_ds = PhCDataset(split_paths["train"], transform=cfg["transform"])
-        val_ds   = PhCDataset(split_paths["val"], transform=cfg["transform"])
-        test_ds  = PhCDataset(split_paths["test"], transform=cfg["transform"])
-        is_retina = False
-    else:
-        train_ds = RetinaDataset(split_paths["train"], root=cfg["retina_root"], transform=cfg["transform"], image_size=cfg["image_size"])
-        val_ds   = RetinaDataset(split_paths["val"], root=cfg["retina_root"], transform=cfg["transform"], image_size=cfg["image_size"])
-        test_ds  = RetinaDataset(split_paths["test"], root=cfg["retina_root"], transform=cfg["transform"], image_size=cfg["image_size"])
-        is_retina = True
-    return train_ds, val_ds, test_ds, is_retina
-
 def main():
     args = parse_args()
     with open(args.config) as f:
         cfg = yaml.safe_load(f)
 
     torch.manual_seed(cfg["seed"])
-
-    # Transformation de base pour les images
-    cfg["transform"] = transforms.Compose([
-        transforms.Resize((cfg["image_size"], cfg["image_size"])),
+    size = cfg["image_size"]
+    transform = transforms.Compose([
+        transforms.Resize((size,size)),
         transforms.ToTensor()
     ])
 
-    # Charger splits
-    split_paths = {}
-    split_paths["train"] = load_paths(f"splits/{args.dataset}_train.txt")
-    split_paths["val"]   = load_paths(f"splits/{args.dataset}_val.txt")
-    split_paths["test"]  = load_paths(f"splits/{args.dataset}_test.txt")
-
-    train_ds, val_ds, test_ds, is_retina = build_dataset(args.dataset, split_paths, cfg)
+    if args.dataset == "phc":
+        train_paths = load_paths("splits/phc_train.txt")
+        val_paths = load_paths("splits/phc_val.txt")
+        test_paths = load_paths("splits/phc_test.txt")
+        train_ds = PhCDataset(train_paths, transform=transform)
+        val_ds = PhCDataset(val_paths, transform=transform)
+        test_ds = PhCDataset(test_paths, transform=transform)
+        is_retina = False
+    else:
+        train_paths = load_paths("splits/retina_train.txt")
+        print("TRAIN PATHS SAMPLE:", train_paths[:10])
+        val_paths = load_paths("splits/retina_val.txt")
+        print("VAL PATHS SAMPLE:", val_paths[:10])
+        test_paths = load_paths("splits/retina_test.txt")
+        train_ds = RetinaDataset(train_paths, cfg["retina_root"], transform)
+        val_ds = RetinaDataset(val_paths, cfg["retina_root"], transform)
+        test_ds = RetinaDataset(test_paths, cfg["retina_root"], transform)
+        is_retina = True
 
     train_loader = DataLoader(train_ds, batch_size=cfg["batch_size"], shuffle=True, num_workers=0)
-    val_loader   = DataLoader(val_ds, batch_size=cfg["batch_size"], shuffle=False, num_workers=0)
-    test_loader  = DataLoader(test_ds, batch_size=cfg["batch_size"], shuffle=False, num_workers=0)
+    val_loader = DataLoader(val_ds, batch_size=cfg["batch_size"], shuffle=True, num_workers=0)
+    test_loader = DataLoader(test_ds, batch_size=cfg["batch_size"], shuffle=True, num_workers=0)
 
-    # Créer modèle
     if args.model == "encdec":
         model = EncDec()
     else:
         model = UNet(in_channels=3, out_channels=1, base=cfg["unet_base"], depth=cfg["unet_depth"])
-    model = model.to(args.device)
 
+    model = model.to(args.device)
     loss_fn = get_loss(args.loss)
-    optimizer = optim.Adam(model.parameters(), lr=cfg["lr"])
+    opt = optim.Adam(model.parameters(), lr=cfg["lr"])
 
     best_val_dice = 0
     os.makedirs("checkpoints", exist_ok=True)
 
     for epoch in range(cfg["epochs"]):
-        # --- Train ---
         model.train()
         epoch_loss = 0
         for batch in train_loader:
@@ -110,12 +106,11 @@ def main():
 
             logits = model(imgs)
             loss = loss_fn(logits, masks)
-            optimizer.zero_grad()
+            opt.zero_grad()
             loss.backward()
-            optimizer.step()
+            opt.step()
             epoch_loss += loss.item()
 
-        # --- Validation ---
         model.eval()
         val_metrics = []
         with torch.no_grad():
@@ -129,23 +124,21 @@ def main():
                     imgs = imgs.to(args.device)
                     masks = masks.to(args.device)
                     fov = None
-
                 logits = model(imgs)
                 probs = torch.sigmoid(logits)
-
                 for i in range(probs.shape[0]):
                     pred_sel = probs[i]
                     mask_sel = masks[i]
-                    fov_sel = fov[i] if fov is not None else None
-                    mask_for_metric = (fov_sel > 0) if fov_sel is not None else None
-                    m = compute_all(pred_sel, mask_sel, mask=mask_for_metric)
+                    if fov is not None:
+                        fov_sel = fov[i]
+                        m = compute_all(pred_sel, mask_sel, mask=(fov_sel > 0))
+                    else:
+                        m = compute_all(pred_sel, mask_sel, mask=None)
                     val_metrics.append({k: v.item() for k,v in m.items()})
 
         avg_val = {k: np.mean([m[k] for m in val_metrics]) for k in val_metrics[0].keys()}
         dice_val = avg_val["dice"]
-
-        print(f"Epoch {epoch+1}/{cfg['epochs']} "
-              f"TrainLoss={epoch_loss/len(train_loader):.4f} "
+        print(f"Epoch {epoch+1}/{cfg['epochs']} TrainLoss={epoch_loss/len(train_loader):.4f} "
               f"ValDice={dice_val:.4f} ValIoU={avg_val['iou']:.4f}")
 
         if dice_val > best_val_dice:
