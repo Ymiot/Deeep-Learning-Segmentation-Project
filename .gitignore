@@ -127,6 +127,7 @@ dmypy.json
 # VS Code
 .vscode/
 
+
 # macOS
 .DS_Store
 .AppleDouble
@@ -141,8 +142,6 @@ $RECYCLE.BIN/
 # Project specific
 checkpoints/
 outputs/
-plots/
-visualizations/
 logs/
 splits/
 
