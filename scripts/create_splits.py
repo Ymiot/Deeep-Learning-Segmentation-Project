@@ -51,15 +51,27 @@ def make_phc_triplet(img_path, root, subset):
     return img_path, label_path  # PHC n'a qu'un seul fichier de label
 
 def make_drive_triplet(img_path, root, train=True):
+    """
+    DRIVE structure fixée :
+      TRAIN:
+        - mask = training/mask/XX_training_mask.gif
+        - label = training/1st_manual/XX_manual1.gif
+      TEST:
+        - mask = test/mask/XX_test_mask.gif
+        - label = mask (car pas de 1st_manual)
+    """
+
     stem = os.path.splitext(os.path.basename(img_path))[0]
-    id_part = stem.split("_")[0]
+    id_part = stem.split("_")[0]   # "21" depuis "21_training"
 
     if train:
-        mask_path  = os.path.join(root, "training", "mask",       f"{id_part}_training_mask.gif")
+        # TRAIN: mask + 1st_manual
+        mask_path = os.path.join(root, "training", "mask", f"{id_part}_training_mask.gif")
         label_path = os.path.join(root, "training", "1st_manual", f"{id_part}_manual1.gif")
     else:
-        mask_path  = os.path.join(root, "test", "mask",       f"{id_part}_test_mask.gif")
-        label_path = os.path.join(root, "test", "1st_manual", f"{id_part}_manual1.gif")
+        # TEST: pas de 1st_manual -> utiliser mask comme label
+        mask_path = os.path.join(root, "test", "mask", f"{id_part}_test_mask.gif")
+        label_path = mask_path
 
     return img_path, mask_path, label_path
 
@@ -142,4 +154,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
