@@ -1,0 +1,102 @@
+================================================================================
+WEAK SUPERVISION EXPERIMENTS SUMMARY
+================================================================================
+
+Configuration        Best Dice    Final Train Loss   Epochs  
+--------------------------------------------------------------------------------
+5+5 clicks           0.9504       0.0566             40      
+10+10 clicks         0.9566       0.0485             40      
+20+20 clicks         0.9631       0.0329             40      
+10+50 clicks         0.9700       0.0323             40      
+30+30 clicks         0.9619       0.0329             40      
+50+10 clicks         0.9435       0.0251             40      
+50+50 clicks         0.9681       0.0357             40      
+300+300 clicks       0.9656       0.0251             40      
+500+500 clicks       0.9691       0.0248             40      
+
+================================================================================
+
+Detailed Metrics (at best epoch):
+--------------------------------------------------------------------------------
+
+
+5+5 clicks:
+  Best Validation Dice: 0.9504
+  Final Validation Metrics:
+    Dice           : 0.9461
+    Iou            : 0.8997
+    Accuracy       : 0.9706
+    Sensitivity    : 0.9914
+    Specificity    : 0.9631
+
+10+10 clicks:
+  Best Validation Dice: 0.9566
+  Final Validation Metrics:
+    Dice           : 0.9475
+    Iou            : 0.9015
+    Accuracy       : 0.9718
+    Sensitivity    : 0.9886
+    Specificity    : 0.9665
+
+20+20 clicks:
+  Best Validation Dice: 0.9631
+  Final Validation Metrics:
+    Dice           : 0.9555
+    Iou            : 0.9157
+    Accuracy       : 0.9762
+    Sensitivity    : 0.9962
+    Specificity    : 0.9690
+
+10+50 clicks:
+  Best Validation Dice: 0.9700
+  Final Validation Metrics:
+    Dice           : 0.9633
+    Iou            : 0.9294
+    Accuracy       : 0.9803
+    Sensitivity    : 0.9880
+    Specificity    : 0.9774
+
+30+30 clicks:
+  Best Validation Dice: 0.9619
+  Final Validation Metrics:
+    Dice           : 0.9554
+    Iou            : 0.9151
+    Accuracy       : 0.9757
+    Sensitivity    : 0.9932
+    Specificity    : 0.9691
+
+50+10 clicks:
+  Best Validation Dice: 0.9435
+  Final Validation Metrics:
+    Dice           : 0.9363
+    Iou            : 0.8808
+    Accuracy       : 0.9647
+    Sensitivity    : 0.9978
+    Specificity    : 0.9527
+
+50+50 clicks:
+  Best Validation Dice: 0.9681
+  Final Validation Metrics:
+    Dice           : 0.9584
+    Iou            : 0.9205
+    Accuracy       : 0.9775
+    Sensitivity    : 0.9941
+    Specificity    : 0.9714
+
+300+300 clicks:
+  Best Validation Dice: 0.9656
+  Final Validation Metrics:
+    Dice           : 0.9609
+    Iou            : 0.9252
+    Accuracy       : 0.9790
+    Sensitivity    : 0.9937
+    Specificity    : 0.9736
+
+500+500 clicks:
+  Best Validation Dice: 0.9691
+  Final Validation Metrics:
+    Dice           : 0.9649
+    Iou            : 0.9323
+    Accuracy       : 0.9812
+    Sensitivity    : 0.9947
+    Specificity    : 0.9763

@@ -18,6 +18,10 @@ CLICK_CONFIGS=(
     "20 20"
     "30 30"
     "50 50"
+    "10 50"
+    "50 10"
+    "300 300"
+    "500 500"
 )
 
 # Optional: Uncomment to test different models
