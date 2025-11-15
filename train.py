@@ -137,6 +137,7 @@ def main():
                     val_metrics.append({k: v.item() for k,v in m.items()})
 
         avg_val = {k: np.mean([m[k] for m in val_metrics]) for k in val_metrics[0].keys()}
+        dice_val = avg_val["dice"]
         metric_str = " ".join([f"{k}={v:.4f}" for k, v in avg_val.items()])
         print(f"Epoch {epoch+1}/{cfg['epochs']} TrainLoss={epoch_loss/len(train_loader):.4f} {metric_str}")
 
