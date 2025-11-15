@@ -86,7 +86,10 @@ def main():
 
     best_val_dice = 0
     os.makedirs("checkpoints", exist_ok=True)
-    os.makedirs("plots/weak_supervision", exist_ok=True)
+    
+    # Create subdirectory for this training session
+    session_dir = f"plots/weak_supervision/{args.model}_{args.num_pos_clicks}pos_{args.num_neg_clicks}neg"
+    os.makedirs(session_dir, exist_ok=True)
 
     # -------------------------
     # History for curves
@@ -261,7 +264,7 @@ def main():
     plt.title(f"Training Loss - Weak Supervision ({args.num_pos_clicks}+{args.num_neg_clicks} clicks)", fontsize=14)
     plt.legend(fontsize=11)
     plt.grid(True, alpha=0.3)
-    plot_name = f"plots/weak_supervision/loss_{args.model}_{args.num_pos_clicks}pos_{args.num_neg_clicks}neg.png"
+    plot_name = f"{session_dir}/loss.png"
     plt.savefig(plot_name, dpi=300, bbox_inches='tight')
     plt.close()
     print(f"Loss plot saved to: {plot_name}")
@@ -280,10 +283,10 @@ def main():
         plt.title(f"{metric.capitalize()} - Train vs Val (Weak Supervision, {args.num_pos_clicks}+{args.num_neg_clicks} clicks)", fontsize=14)
         plt.legend(fontsize=11)
         plt.grid(True, alpha=0.3)
-        plot_name = f"plots/weak_supervision/{metric}_{args.model}_{args.num_pos_clicks}pos_{args.num_neg_clicks}neg.png"
+        plot_name = f"{session_dir}/{metric}.png"
         plt.savefig(plot_name, dpi=300, bbox_inches='tight')
         plt.close()
-    print(f"Metric plots saved to: plots/weak_supervision/")
+    print(f"Metric plots saved to: {session_dir}/")
     
     # -------------------------
     # Plot Combined Overview (Loss + Accuracy)
@@ -312,10 +315,11 @@ def main():
     plt.suptitle(f"Training Overview - {args.model.upper()} ({args.num_pos_clicks}+{args.num_neg_clicks} clicks)", 
                 fontsize=16, fontweight='bold')
     plt.tight_layout()
-    plot_name = f"plots/weak_supervision/overview_{args.model}_{args.num_pos_clicks}pos_{args.num_neg_clicks}neg.png"
+    plot_name = f"{session_dir}/overview.png"
     plt.savefig(plot_name, dpi=300, bbox_inches='tight')
     plt.close()
     print(f"Overview plot saved to: {plot_name}")
+    print(f"\nAll plots saved to: {session_dir}/")
 
     print("\n" + "="*60)
     print("Training complete!")
