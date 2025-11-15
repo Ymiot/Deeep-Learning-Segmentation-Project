@@ -154,15 +154,6 @@ splits/
 *.pickle
 *.safetensors
 
-# Images and videos
-*.jpg
-*.png
-*.gif
-*.tif
-*.tiff
-*.mp4
-*.avi
-
 # Data directories
 data/
 dataset/
