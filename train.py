@@ -6,6 +6,7 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 import torchvision.transforms as transforms
 import numpy as np
+import matplotlib.pyplot as plt
 
 from lib.model.EncDecModel import EncDec
 from lib.model.UNetModel import UNet
@@ -13,8 +14,6 @@ from lib.losses import BCELoss, DiceLoss, FocalLoss, BCELoss_TotalVariation
 from lib.metrics import compute_all
 from lib.datasets.phc_dataset import PhCDataset
 from lib.datasets.retina_dataset import RetinaDataset
-
-import torch.nn.functional as F
 
 def parse_args():
     p = argparse.ArgumentParser()
@@ -55,6 +54,9 @@ def main():
         transforms.ToTensor()
     ])
 
+    # -------------------------
+    # Dataset
+    # -------------------------
     if args.dataset == "phc":
         train_paths = load_paths("splits/phc_train.txt")
         val_paths = load_paths("splits/phc_val.txt")
@@ -65,9 +67,7 @@ def main():
         is_retina = False
     else:
         train_paths = load_paths("splits/retina_train.txt")
-        print("TRAIN PATHS SAMPLE:", train_paths[:10])
         val_paths = load_paths("splits/retina_val.txt")
-        print("VAL PATHS SAMPLE:", val_paths[:10])
         test_paths = load_paths("splits/retina_test.txt")
         train_ds = RetinaDataset(train_paths, cfg["retina_root"], transform)
         val_ds = RetinaDataset(val_paths, cfg["retina_root"], transform)
@@ -78,19 +78,33 @@ def main():
     val_loader = DataLoader(val_ds, batch_size=cfg["batch_size"], shuffle=True, num_workers=0)
     test_loader = DataLoader(test_ds, batch_size=cfg["batch_size"], shuffle=True, num_workers=0)
 
+    # -------------------------
+    # Model & Optimizer
+    # -------------------------
     if args.model == "encdec":
         model = EncDec()
     else:
         model = UNet(in_channels=3, out_channels=1, base=cfg["unet_base"], depth=cfg["unet_depth"])
-
     model = model.to(args.device)
     loss_fn = get_loss(args.loss)
     opt = optim.Adam(model.parameters(), lr=cfg["lr"])
 
     best_val_dice = 0
     os.makedirs("checkpoints", exist_ok=True)
+    os.makedirs("plots", exist_ok=True)
+
+    # -------------------------
+    # History for curves
+    # -------------------------
+    train_loss_history = []
+    val_loss_history = []
+    train_metrics_history = {}
+    val_metrics_history = {}
 
     for epoch in range(cfg["epochs"]):
+        # -------------------------
+        # Training
+        # -------------------------
         model.train()
         epoch_loss = 0
         for batch in train_loader:
@@ -111,8 +125,11 @@ def main():
             opt.step()
             epoch_loss += loss.item()
 
+        avg_train_loss = epoch_loss / len(train_loader)
+        train_loss_history.append(avg_train_loss)
+
         # -------------------------
-        # Compute metrics on TRAIN split
+        # Metrics on TRAIN
         # -------------------------
         model.eval()
         train_metrics = []
@@ -127,6 +144,7 @@ def main():
                     imgs = imgs.to(args.device)
                     masks = masks.to(args.device)
                     fov = None
+
                 logits = model(imgs)
                 probs = torch.sigmoid(logits)
                 for i in range(probs.shape[0]):
@@ -138,12 +156,21 @@ def main():
                     else:
                         m = compute_all(pred_sel, mask_sel, mask=None)
                     train_metrics.append({k: v.item() for k, v in m.items()})
+
         avg_train = {k: np.mean([m[k] for m in train_metrics]) for k in train_metrics[0].keys()}
+        # Init metrics history dicts
+        if epoch == 0:
+            for k in avg_train.keys():
+                train_metrics_history[k] = []
+                val_metrics_history[k] = []
+        for k in avg_train.keys():
+            train_metrics_history[k].append(avg_train[k])
 
         # -------------------------
-        # Compute metrics on VAL split
+        # Metrics on VAL
         # -------------------------
         val_metrics = []
+        val_epoch_loss = 0
         with torch.no_grad():
             for batch in val_loader:
                 if is_retina:
@@ -155,7 +182,10 @@ def main():
                     imgs = imgs.to(args.device)
                     masks = masks.to(args.device)
                     fov = None
+
                 logits = model(imgs)
+                loss = loss_fn(logits, masks)
+                val_epoch_loss += loss.item()
                 probs = torch.sigmoid(logits)
                 for i in range(probs.shape[0]):
                     pred_sel = probs[i]
@@ -166,18 +196,54 @@ def main():
                     else:
                         m = compute_all(pred_sel, mask_sel, mask=None)
                     val_metrics.append({k: v.item() for k, v in m.items()})
-        avg_val = {k: np.mean([m[k] for m in val_metrics]) for k in val_metrics[0].keys()}
 
-        dice_val = avg_val["dice"]
+        avg_val = {k: np.mean([m[k] for m in val_metrics]) for k in val_metrics[0].keys()}
+        avg_val_loss = val_epoch_loss / len(val_loader)
+        val_loss_history.append(avg_val_loss)
+        for k in avg_val.keys():
+            val_metrics_history[k].append(avg_val[k])
+
         train_str = " ".join([f"{k}={v:.4f}" for k, v in avg_train.items()])
         val_str = " ".join([f"{k}={v:.4f}" for k, v in avg_val.items()])
-        print(f"Epoch {epoch+1}/{cfg['epochs']} TrainLoss={epoch_loss/len(train_loader):.4f} "
+        print(f"Epoch {epoch+1}/{cfg['epochs']} TrainLoss={avg_train_loss:.4f} ValLoss={avg_val_loss:.4f} "
               f"TRAIN: {train_str} VAL: {val_str}")
 
-        if dice_val > best_val_dice:
-            best_val_dice = dice_val
+        # -------------------------
+        # Save best model
+        # -------------------------
+        if avg_val["dice"] > best_val_dice:
+            best_val_dice = avg_val["dice"]
             torch.save(model.state_dict(), f"checkpoints/{args.model}_{args.dataset}_best.pt")
             print("  -> New best model saved.")
+
+    # -------------------------
+    # Plot Loss Curves
+    # -------------------------
+    plt.figure()
+    plt.plot(range(1, cfg["epochs"]+1), train_loss_history, label="Train Loss")
+    plt.plot(range(1, cfg["epochs"]+1), val_loss_history, label="Val Loss")
+    plt.xlabel("Epoch")
+    plt.ylabel("Loss")
+    plt.title("Training and Validation Loss")
+    plt.legend()
+    plt.grid(True)
+    plt.savefig("plots/loss_curves.png")
+    plt.show()
+
+    # -------------------------
+    # Plot Metrics Curves
+    # -------------------------
+    for metric in train_metrics_history.keys():
+        plt.figure()
+        plt.plot(range(1, cfg["epochs"]+1), train_metrics_history[metric], label=f"Train {metric}")
+        plt.plot(range(1, cfg["epochs"]+1), val_metrics_history[metric], label=f"Val {metric}")
+        plt.xlabel("Epoch")
+        plt.ylabel(metric)
+        plt.title(f"Train vs Val {metric}")
+        plt.legend()
+        plt.grid(True)
+        plt.savefig(f"plots/{metric}_curves.png")
+        plt.show()
 
     print("Training complete.")
 
