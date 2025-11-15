@@ -40,6 +40,8 @@ class RetinaDataset(Dataset):
         # FOV : zone visible de la rétine
         if os.path.exists(label_path):
             fov = Image.open(label_path).convert("L")
+            # convertir fov en binaire 0/1 pour zone valide
+            fov = fov.point(lambda p: 255 if p > 0 else 0)
         else:
             # Si pas de FOV réel, considérer toute l'image comme valide
             fov = Image.new("L", mask.size, 255)
