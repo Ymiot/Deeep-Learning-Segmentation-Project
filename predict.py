@@ -6,6 +6,7 @@ from torch.utils.data import DataLoader
 import torchvision.transforms as transforms
 import numpy as np
 from PIL import Image
+import matplotlib.pyplot as plt
 
 from lib.model.EncDecModel import EncDec
 from lib.model.UNetModel import UNet
@@ -21,6 +22,7 @@ def parse_args():
     p.add_argument("--checkpoint", type=str, required=True)
     p.add_argument("--out", type=str, default="outputs/test/")
     p.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu")
+    p.add_argument("--visualize", action="store_true", help="Show predictions during testing")
     return p.parse_args()
 
 def load_paths(path):
@@ -41,7 +43,7 @@ def main():
     torch.manual_seed(cfg["seed"])
     size = cfg["image_size"]
     transform = transforms.Compose([
-        transforms.Resize((size,size)),
+        transforms.Resize((size, size)),
         transforms.ToTensor()
     ])
 
@@ -69,7 +71,6 @@ def main():
     model = model.to(args.device)
     model.eval()
 
-    # Metrics
     all_metrics = []
 
     with torch.no_grad():
@@ -90,18 +91,32 @@ def main():
             for i in range(probs.shape[0]):
                 pred_sel = probs[i]
                 mask_sel = masks[i]
+
                 if fov is not None:
                     fov_sel = fov[i]
                     m = compute_all(pred_sel, mask_sel, mask=(fov_sel > 0))
                 else:
                     m = compute_all(pred_sel, mask_sel, mask=None)
-                all_metrics.append({k: v.item() for k,v in m.items()})
 
-                # Save prediction
-                pred_img = (pred_sel.cpu().numpy() * 255).astype(np.uint8)
-                pred_img = Image.fromarray(pred_img)
+                all_metrics.append({k: v.item() for k, v in m.items()})
+
+                # Convert prediction to image
+                pred_img = (pred_sel.cpu().numpy() > 0.5).astype(np.uint8) * 255  # Binarize and scale to 0-255
+                pred_img = np.squeeze(pred_img)  # remove channel dimension [1,H,W] -> [H,W]
                 img_name = f"pred_{idx*probs.shape[0]+i}.png"
-                pred_img.save(os.path.join(args.out, img_name))
+                Image.fromarray(pred_img).save(os.path.join(args.out, img_name))
+
+                if args.visualize:
+                    plt.figure(figsize=(10,5))
+                    plt.subplot(1,2,1)
+                    plt.title("Ground Truth")
+                    plt.imshow(mask_sel.cpu().numpy().squeeze(), cmap="gray")
+                    plt.axis("off")
+                    plt.subplot(1,2,2)
+                    plt.title("Prediction")
+                    plt.imshow(pred_img, cmap="gray")
+                    plt.axis("off")
+                    plt.show()
 
     avg_metrics = {k: np.mean([m[k] for m in all_metrics]) for k in all_metrics[0].keys()}
     print("=== Test set metrics ===")
