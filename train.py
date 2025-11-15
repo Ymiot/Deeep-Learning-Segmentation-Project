@@ -129,8 +129,11 @@ def main():
                 for i in range(probs.shape[0]):
                     pred_sel = probs[i]
                     mask_sel = masks[i]
-                    fov_sel = fov[i] if fov is not None else None
-                    m = compute_all(pred_sel, mask_sel, mask=(fov_sel > 0))
+                    if fov is not None:
+                        fov_sel = fov[i]
+                        m = compute_all(pred_sel, mask_sel, mask=(fov_sel > 0))
+                    else:
+                        m = compute_all(pred_sel, mask_sel, mask=None)
                     val_metrics.append({k: v.item() for k,v in m.items()})
 
         avg_val = {k: np.mean([m[k] for m in val_metrics]) for k in val_metrics[0].keys()}
