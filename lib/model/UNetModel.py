@@ -27,10 +27,11 @@ class UNet(nn.Module):
         self.ups = nn.ModuleList()
         self.up_convs = nn.ModuleList()
 
-
+        bottleneck_channels = prev * 2
+        prev = bottleneck_channels
         for d in reversed(range(depth)):
             outc = base * (2**d)
-            self.ups.append(nn.ConvTranspose2d(prev*2, outc, 2, stride=2))
+            self.ups.append(nn.ConvTranspose2d(prev, outc, 2, stride=2))
             self.up_convs.append(double_conv(outc*2, outc))  # <- inc = x_after_up + skip
             prev = outc
         self.final = nn.Conv2d(base, out_channels, 1)
