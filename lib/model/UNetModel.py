@@ -26,11 +26,12 @@ class UNet(nn.Module):
         self.bottleneck = double_conv(prev, prev*2)
         self.ups = nn.ModuleList()
         self.up_convs = nn.ModuleList()
+
+
         for d in reversed(range(depth)):
-            inc = prev*2
             outc = base * (2**d)
-            self.ups.append(nn.ConvTranspose2d(inc, outc, 2, stride=2))
-            self.up_convs.append(double_conv(inc, outc))
+            self.ups.append(nn.ConvTranspose2d(prev*2, outc, 2, stride=2))
+            self.up_convs.append(double_conv(outc*2, outc))  # <- inc = x_after_up + skip
             prev = outc
         self.final = nn.Conv2d(base, out_channels, 1)
 
