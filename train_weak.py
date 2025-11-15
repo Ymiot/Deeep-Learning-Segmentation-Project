@@ -143,7 +143,8 @@ def main():
                     # Convert point_mask to binary (0 and 1 only) for metric computation
                     valid_mask = (mask_sel != -1)
                     if valid_mask.sum() > 0:
-                        m = compute_all(pred_sel, mask_sel.clamp(0, 1), mask=valid_mask.squeeze())
+                        # Ensure mask has same shape as pred_sel (keep channel dimension)
+                        m = compute_all(pred_sel, mask_sel.clamp(0, 1), mask=(valid_mask > 0))
                         train_metrics.append({k: v.item() for k, v in m.items()})
         
         avg_train = {k: np.mean([m[k] for m in train_metrics]) for k in train_metrics[0].keys()}
