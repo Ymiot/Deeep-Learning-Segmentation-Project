@@ -277,7 +277,7 @@ def main():
                 label=f"Val {metric}", linewidth=2)
         plt.xlabel("Epoch", fontsize=12)
         plt.ylabel(metric.capitalize(), fontsize=12)
-        plt.title(f"{metric.capitalize()} - Train vs Val (Weak Supervision)", fontsize=14)
+        plt.title(f"{metric.capitalize()} - Train vs Val (Weak Supervision, {args.num_pos_clicks}+{args.num_neg_clicks} clicks)", fontsize=14)
         plt.legend(fontsize=11)
         plt.grid(True, alpha=0.3)
         plot_name = f"plots/weak_supervision/{metric}_{args.model}_{args.num_pos_clicks}pos_{args.num_neg_clicks}neg.png"
