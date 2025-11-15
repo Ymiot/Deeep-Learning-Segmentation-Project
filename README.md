@@ -53,8 +53,8 @@ python train.py --config configs/default.yaml --model encdec --dataset phc --los
 ## Predict
 
 ```
-python predict.py --checkpoint checkpoints/encdec_retina_best.pt --dataset retina --model encdec --out outputs/retina/test/
-python predict.py --checkpoint checkpoints/encdec_phc_best.pt --dataset phc --model encdec --out outputs/phc/test/
+python predict.py --config configs/default.yaml --model encdec --dataset retina --checkpoint checkpoints/encdec_retina_best.pt --out outputs/retina/test/
+python predict.py --config configs/default.yaml --model encdec --dataset phc --checkpoint checkpoints/encdec_phc_best.pt --out outputs/phc/test/
 ```
 
 ## Measure
