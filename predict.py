@@ -106,15 +106,26 @@ def main():
                 Image.fromarray(pred_img).save(os.path.join(args.out, img_name))
 
                 if args.visualize:
-                    plt.figure(figsize=(10,5))
-                    plt.subplot(1,2,1)
+                    img_display = imgs[i].cpu().permute(1,2,0).numpy()  # [C,H,W] -> [H,W,C]
+                    mask_display = mask_sel.cpu().numpy().squeeze()
+                    pred_display = pred_sel.cpu().numpy().squeeze()
+    
+                    plt.figure(figsize=(15,5))
+                    plt.subplot(1,3,1)
+                    plt.title("Input Image")
+                    plt.imshow(img_display)
+                    plt.axis("off")
+
+                    plt.subplot(1,3,2)
                     plt.title("Ground Truth")
-                    plt.imshow(mask_sel.cpu().numpy().squeeze(), cmap="gray")
+                    plt.imshow(mask_display, cmap="gray")
                     plt.axis("off")
-                    plt.subplot(1,2,2)
+
+                    plt.subplot(1,3,3)
                     plt.title("Prediction")
-                    plt.imshow(pred_img, cmap="gray")
+                    plt.imshow(pred_display, cmap="gray")
                     plt.axis("off")
+
                     plt.show()
 
     avg_metrics = {k: np.mean([m[k] for m in all_metrics]) for k in all_metrics[0].keys()}
