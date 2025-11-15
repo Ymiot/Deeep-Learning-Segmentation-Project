@@ -93,6 +93,7 @@ def main():
     # -------------------------
     train_loss_history = []
     val_loss_history = []
+    train_metrics_history = {}
     val_metrics_history = {}
 
     print(f"Training with weak supervision: {args.num_pos_clicks} positive clicks, {args.num_neg_clicks} negative clicks")
@@ -122,6 +123,32 @@ def main():
         train_loss_history.append(avg_train_loss)
 
         # -------------------------
+        # Compute training metrics (for tracking)
+        # -------------------------
+        model.eval()
+        train_metrics = []
+        with torch.no_grad():
+            for batch in train_loader:
+                imgs, point_masks = batch
+                imgs = imgs.to(args.device)
+                point_masks = point_masks.to(args.device)
+                
+                logits = model(imgs)
+                probs = torch.sigmoid(logits)
+                
+                # Compute metrics only on clicked pixels for training
+                for i in range(probs.shape[0]):
+                    pred_sel = probs[i]
+                    mask_sel = point_masks[i]
+                    # Convert point_mask to binary (0 and 1 only) for metric computation
+                    valid_mask = (mask_sel != -1)
+                    if valid_mask.sum() > 0:
+                        m = compute_all(pred_sel, mask_sel.clamp(0, 1), mask=valid_mask.squeeze())
+                        train_metrics.append({k: v.item() for k, v in m.items()})
+        
+        avg_train = {k: np.mean([m[k] for m in train_metrics]) for k in train_metrics[0].keys()}
+
+        # -------------------------
         # Validation with full masks
         # -------------------------
         model.eval()
@@ -149,12 +176,30 @@ def main():
         # Init metrics history dicts
         if epoch == 0:
             for k in avg_val.keys():
+                train_metrics_history[k] = []
                 val_metrics_history[k] = []
         for k in avg_val.keys():
+            train_metrics_history[k].append(avg_train[k])
             val_metrics_history[k].append(avg_val[k])
 
+        # Regular epoch logging
         val_str = " ".join([f"{k}={v:.4f}" for k, v in avg_val.items()])
         print(f"Epoch {epoch+1}/{cfg['epochs']} TrainLoss={avg_train_loss:.4f} VAL: {val_str}")
+        
+        # Detailed progress every 10 epochs
+        if (epoch + 1) % 10 == 0 or epoch == 0:
+            print(f"\n{'='*70}")
+            print(f"Progress Summary - Epoch {epoch+1}/{cfg['epochs']}")
+            print(f"{'='*70}")
+            print(f"Training Loss:   {avg_train_loss:.4f}")
+            print(f"\nTraining Metrics (on clicks):")
+            for k, v in avg_train.items():
+                print(f"  {k.capitalize():15s}: {v:.4f}")
+            print(f"\nValidation Metrics (on full masks):")
+            for k, v in avg_val.items():
+                print(f"  {k.capitalize():15s}: {v:.4f}")
+            print(f"\nBest Val Dice so far: {best_val_dice:.4f}")
+            print(f"{'='*70}\n")
 
         # -------------------------
         # Save best model
@@ -168,6 +213,7 @@ def main():
                 'optimizer_state_dict': opt.state_dict(),
                 'best_val_dice': best_val_dice,
                 'train_loss_history': train_loss_history,
+                'train_metrics_history': train_metrics_history,
                 'val_metrics_history': val_metrics_history,
                 'config': {
                     'model': args.model,
@@ -187,6 +233,7 @@ def main():
     history_file = f"checkpoints/{args.model}_phc_weak_{args.num_pos_clicks}pos_{args.num_neg_clicks}neg_history.json"
     history_data = {
         'train_loss_history': train_loss_history,
+        'train_metrics_history': train_metrics_history,
         'val_metrics_history': val_metrics_history,
         'best_val_dice': best_val_dice,
         'config': {
@@ -204,13 +251,13 @@ def main():
     print(f"Training history saved to: {history_file}")
 
     # -------------------------
-    # Plot Loss Curve
+    # Plot Combined Loss Curve (Train only - no val loss computed)
     # -------------------------
     plt.figure(figsize=(10, 6))
-    plt.plot(range(1, cfg["epochs"]+1), train_loss_history, label="Train Loss (Click Supervision)", linewidth=2)
+    plt.plot(range(1, cfg["epochs"]+1), train_loss_history, label="Train Loss", linewidth=2, color='blue')
     plt.xlabel("Epoch", fontsize=12)
     plt.ylabel("Loss", fontsize=12)
-    plt.title(f"Weak Supervision Training Loss ({args.num_pos_clicks}+{args.num_neg_clicks} clicks)", fontsize=14)
+    plt.title(f"Training Loss - Weak Supervision ({args.num_pos_clicks}+{args.num_neg_clicks} clicks)", fontsize=14)
     plt.legend(fontsize=11)
     plt.grid(True, alpha=0.3)
     plot_name = f"plots/weak_supervision/loss_{args.model}_{args.num_pos_clicks}pos_{args.num_neg_clicks}neg.png"
@@ -219,20 +266,55 @@ def main():
     print(f"Loss plot saved to: {plot_name}")
 
     # -------------------------
-    # Plot Metrics Curves
+    # Plot Combined Metrics (Train vs Val)
     # -------------------------
     for metric in val_metrics_history.keys():
         plt.figure(figsize=(10, 6))
-        plt.plot(range(1, cfg["epochs"]+1), val_metrics_history[metric], label=f"Val {metric}", linewidth=2)
+        plt.plot(range(1, cfg["epochs"]+1), train_metrics_history[metric], 
+                label=f"Train {metric}", linewidth=2, linestyle='--', alpha=0.7)
+        plt.plot(range(1, cfg["epochs"]+1), val_metrics_history[metric], 
+                label=f"Val {metric}", linewidth=2)
         plt.xlabel("Epoch", fontsize=12)
         plt.ylabel(metric.capitalize(), fontsize=12)
-        plt.title(f"Validation {metric.capitalize()} (Weak Supervision)", fontsize=14)
+        plt.title(f"{metric.capitalize()} - Train vs Val (Weak Supervision)", fontsize=14)
         plt.legend(fontsize=11)
         plt.grid(True, alpha=0.3)
         plot_name = f"plots/weak_supervision/{metric}_{args.model}_{args.num_pos_clicks}pos_{args.num_neg_clicks}neg.png"
         plt.savefig(plot_name, dpi=300, bbox_inches='tight')
         plt.close()
     print(f"Metric plots saved to: plots/weak_supervision/")
+    
+    # -------------------------
+    # Plot Combined Overview (Loss + Accuracy)
+    # -------------------------
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
+    
+    # Loss subplot
+    ax1.plot(range(1, cfg["epochs"]+1), train_loss_history, label="Train Loss", linewidth=2, color='blue')
+    ax1.set_xlabel("Epoch", fontsize=12)
+    ax1.set_ylabel("Loss", fontsize=12)
+    ax1.set_title("Training Loss", fontsize=14)
+    ax1.legend(fontsize=11)
+    ax1.grid(True, alpha=0.3)
+    
+    # Accuracy subplot
+    ax2.plot(range(1, cfg["epochs"]+1), train_metrics_history['accuracy'], 
+            label="Train Accuracy", linewidth=2, linestyle='--', alpha=0.7)
+    ax2.plot(range(1, cfg["epochs"]+1), val_metrics_history['accuracy'], 
+            label="Val Accuracy", linewidth=2)
+    ax2.set_xlabel("Epoch", fontsize=12)
+    ax2.set_ylabel("Accuracy", fontsize=12)
+    ax2.set_title("Accuracy - Train vs Val", fontsize=14)
+    ax2.legend(fontsize=11)
+    ax2.grid(True, alpha=0.3)
+    
+    plt.suptitle(f"Training Overview - {args.model.upper()} ({args.num_pos_clicks}+{args.num_neg_clicks} clicks)", 
+                fontsize=16, fontweight='bold')
+    plt.tight_layout()
+    plot_name = f"plots/weak_supervision/overview_{args.model}_{args.num_pos_clicks}pos_{args.num_neg_clicks}neg.png"
+    plt.savefig(plot_name, dpi=300, bbox_inches='tight')
+    plt.close()
+    print(f"Overview plot saved to: {plot_name}")
 
     print("\n" + "="*60)
     print("Training complete!")
