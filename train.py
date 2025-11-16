@@ -72,12 +72,12 @@ def main():
         train_paths = load_paths("splits/retina_train.txt")
         val_paths = load_paths("splits/retina_val.txt")
         test_paths = load_paths("splits/retina_test.txt")
-        # train_ds = RetinaDataset(train_paths, cfg["retina_root"], transform)
-        # val_ds = RetinaDataset(val_paths, cfg["retina_root"], transform)
-        # test_ds = RetinaDataset(test_paths, cfg["retina_root"], transform)
-        train_ds = RetinaDataset(train_paths, cfg["retina_root"], transform, image_size=cfg["image_size"])
-        val_ds = RetinaDataset(val_paths, cfg["retina_root"], transform, image_size=cfg["image_size"])
-        test_ds = RetinaDataset(test_paths, cfg["retina_root"], transform, image_size=cfg["image_size"])
+        train_ds = RetinaDataset(train_paths, cfg["retina_root"], transform)
+        val_ds = RetinaDataset(val_paths, cfg["retina_root"], transform)
+        test_ds = RetinaDataset(test_paths, cfg["retina_root"], transform)
+        # train_ds = RetinaDataset(train_paths, cfg["retina_root"], transform, image_size=cfg["image_size"])
+        # val_ds = RetinaDataset(val_paths, cfg["retina_root"], transform, image_size=cfg["image_size"])
+        # test_ds = RetinaDataset(test_paths, cfg["retina_root"], transform, image_size=cfg["image_size"])
         is_retina = True
 
     train_loader = DataLoader(train_ds, batch_size=cfg["batch_size"], shuffle=True, num_workers=0)
