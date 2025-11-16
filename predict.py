@@ -52,13 +52,13 @@ def main():
     # Load dataset
     if args.dataset == "phc":
         test_paths = load_paths("splits/phc_test.txt")
-        test_ds = PhCDataset(test_paths, transform=transform)
-        #test_ds = PhCDataset(test_paths, transform=transform, image_size=cfg["image_size"])
+        #test_ds = PhCDataset(test_paths, transform=transform)
+        test_ds = PhCDataset(test_paths, transform=transform, image_size=cfg["image_size"])
         is_retina = False
     else:
         test_paths = load_paths("splits/retina_test.txt")
-        test_ds = RetinaDataset(test_paths, cfg["retina_root"], transform)
-        #test_ds = RetinaDataset(test_paths, cfg["retina_root"], transform, image_size=cfg["image_size"])
+        #test_ds = RetinaDataset(test_paths, cfg["retina_root"], transform)
+        test_ds = RetinaDataset(test_paths, cfg["retina_root"], transform, image_size=cfg["image_size"])
         is_retina = True
 
     test_loader = DataLoader(test_ds, batch_size=1, shuffle=False)
