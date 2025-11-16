@@ -61,9 +61,12 @@ def main():
         train_paths = load_paths("splits/phc_train.txt")
         val_paths = load_paths("splits/phc_val.txt")
         test_paths = load_paths("splits/phc_test.txt")
-        train_ds = PhCDataset(train_paths, transform=transform)
-        val_ds = PhCDataset(val_paths, transform=transform)
-        test_ds = PhCDataset(test_paths, transform=transform)
+        #train_ds = PhCDataset(train_paths, transform=transform)
+        #val_ds = PhCDataset(val_paths, transform=transform)
+        #test_ds = PhCDataset(test_paths, transform=transform)
+        train_ds = PhCDataset(train_paths, transform=transform, image_size=cfg["image_size"])
+        val_ds = PhCDataset(val_paths, transform=transform, image_size=cfg["image_size"])
+        test_ds = PhCDataset(test_paths, transform=transform, image_size=cfg["image_size"])
         is_retina = False
     else:
         train_paths = load_paths("splits/retina_train.txt")
