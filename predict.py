@@ -52,7 +52,8 @@ def main():
     # Load dataset
     if args.dataset == "phc":
         test_paths = load_paths("splits/phc_test.txt")
-        test_ds = PhCDataset(test_paths, transform=transform)
+        #test_ds = PhCDataset(test_paths, transform=transform)
+        test_ds = PhCDataset(test_paths, transform=transform, image_size=cfg["image_size"])
         is_retina = False
     else:
         test_paths = load_paths("splits/retina_test.txt")
